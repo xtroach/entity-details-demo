@@ -95,14 +95,32 @@ one.
 ## Verify before calling a PR ready
 
 - Before opening or updating a PR that touches buildable/testable code
-  (anything under `src/` or `test/` — not a docs-only change like
-  `CLAUDE.md` or `README.md`), run `dotnet build` and `dotnet test`
-  locally first. Don't describe a change as ready without having done so.
+  (anything under any project's `*/src/` or `*/test/` — not a docs-only
+  change like `CLAUDE.md` or `README.md`), run `dotnet build` and
+  `dotnet test` locally first. Don't describe a change as ready without
+  having done so.
 - State that verification happened, and its result, in the PR description
   or to me directly, rather than leaving it implicit.
 - There's no CI configured on this repo yet, so this local check is
   currently the only gate. Once CI exists (see #12), this rule should
   also require it green before a PR is called ready (see #13).
+
+## Tests accompany code changes
+
+- New or changed logic in any project's `*/src/` should come with
+  corresponding tests in its `*/test/` in the same PR, not as a
+  follow-up. This covers new behavior,
+  bug fixes (a regression test reproducing the bug), and non-trivial
+  logic changes. Changes on the same scale as what already counts as
+  "trivial" elsewhere in this file (typo fixes, formatting, internal
+  refactors with no external effect) don't need a dedicated test.
+- If it's genuinely unclear whether a change needs a test, flag it and
+  ask rather than silently deciding either way.
+- This is currently a self-enforced expectation, not a measured gate —
+  there's no CI or coverage tooling wired up yet (#12). Once #23 (test
+  coverage gates) lands, this rule should be reconciled with whatever
+  gate that issue settles on, rather than left as a separate parallel
+  rule.
 
 ## Stacked pull requests
 
