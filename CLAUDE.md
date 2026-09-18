@@ -104,6 +104,22 @@ one.
   currently the only gate. Once CI exists (see #12), this rule should
   also require it green before a PR is called ready (see #13).
 
+## Tests accompany code changes
+
+- New or changed logic in `src/` should come with corresponding tests in
+  `test/` in the same PR, not as a follow-up. This covers new behavior,
+  bug fixes (a regression test reproducing the bug), and non-trivial
+  logic changes. Changes on the same scale as what already counts as
+  "trivial" elsewhere in this file (typo fixes, formatting, internal
+  refactors with no external effect) don't need a dedicated test.
+- If it's genuinely unclear whether a change needs a test, flag it and
+  ask rather than silently deciding either way.
+- This is currently a self-enforced expectation, not a measured gate —
+  there's no CI or coverage tooling wired up yet (#12). Once #23 (test
+  coverage gates) lands, this rule should be reconciled with whatever
+  gate that issue settles on, rather than left as a separate parallel
+  rule.
+
 ## Stacked pull requests
 
 - If a change depends on content that only exists on another open,
