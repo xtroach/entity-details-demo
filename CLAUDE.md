@@ -81,6 +81,12 @@ one.
 - Do not merge, approve, or close the pull request yourself — that's my
   call. Opening it is the end of the task unless I explicitly ask you to
   merge it too.
+- When merging is asked for, default to "Create a merge commit." It's the
+  only GitHub merge method that never rewrites already-pushed commits —
+  squash discards individual commit history, and "Rebase and merge"
+  re-creates every commit with a new SHA — consistent with the Git
+  history rule below. This still doesn't make a dependent stacked branch
+  fast-forwardable afterward; see "Stacked pull requests."
 
 ## Stacked pull requests
 
