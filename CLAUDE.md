@@ -82,6 +82,18 @@ one.
   call. Opening it is the end of the task unless I explicitly ask you to
   merge it too.
 
+## Verify before calling a PR ready
+
+- Before opening or updating a PR that touches buildable/testable code
+  (anything under `src/` or `test/` — not a docs-only change like
+  `CLAUDE.md` or `README.md`), run `dotnet build` and `dotnet test`
+  locally first. Don't describe a change as ready without having done so.
+- State that verification happened, and its result, in the PR description
+  or to me directly, rather than leaving it implicit.
+- There's no CI configured on this repo yet, so this local check is
+  currently the only gate. Once CI exists (see #12), this rule should
+  also require it green before a PR is called ready (see #13).
+
 ## Stacked pull requests
 
 - If a change depends on content that only exists on another open,
