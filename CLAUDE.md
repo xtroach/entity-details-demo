@@ -12,7 +12,8 @@ Required sections:
 - **Folder Structure** Overview of the folder structure and organization of the project
 - **Setup** — steps to get a dev environment running (prerequisites, install, 
   first run)
-- **CodeConventions** - Synopsis of code conventions, fo
+- **CodeConventions** - Synopsis of code conventions, for quick reference
+  without reading `.editorconfig` directly
 - **Configuration** — environment variables, config files, and settings that 
   affect behavior, with defaults noted
 - **Architecture** — high-level structure: main components/projects, how 
@@ -43,23 +44,33 @@ Private members should be documented only when their logic is non-obvious.
 
 # Workflow
 
-## Issue-first workflow
+## Scope, implement, or trivial
 
-When I ask you to plan, design, or scope a feature/bugfix (rather than
-explicitly saying "implement" or "fix it now"):
+When a conversation involves talking through a design or approach (not a
+simple one-off fix), once we reach a decision, offer me the three ways to
+proceed — unless I've already declared one earlier in the conversation
+(e.g. by saying "scope this," "implement this," or "this is trivial"):
 
-1. Do NOT edit any files.
-2. Investigate the codebase as needed to understand the change.
-3. Write up a GitHub issue using `gh issue create` with:
-   - A clear title
-   - Problem/context section
-   - Proposed approach
-   - Relevant files/functions you found, with paths
-   - Any open questions or risks
-4. Print the issue URL when done.
+- **Scope** — write up a GitHub issue (`gh issue create`) capturing the
+  decision: title, problem/context, the approach we landed on and the
+  reasoning behind it, relevant files/functions with paths, and any open
+  questions or risks. Write it with enough detail that implementing from
+  the issue alone, with no memory of this conversation, would produce
+  essentially the same change. Do not edit any files. Only start
+  implementing later when I explicitly reference the issue number.
+- **Implement** — write the same kind of issue first, to the same detail
+  bar, then continue straight into implementing it in this same workflow
+  — no waiting for me to separately reference the issue number.
+  Reference the issue from the resulting PR (e.g. "Closes #N") so it
+  closes automatically when the PR merges.
+- **Trivial** — no issue, just make the change directly. Reserved for
+  changes on the same scale as what already counts as "trivial" elsewhere
+  in this file (typo fixes, formatting, internal refactors with no
+  external effect). For anything bigger, use Scope or Implement instead
+  of assuming this is trivial.
 
-Only start implementing when I explicitly reference an issue number and
-ask you to work on it (e.g. "pick up #42").
+Whichever I choose, wait for my answer before acting — don't default to
+one.
 
 ## Pull requests only on main/master
 
