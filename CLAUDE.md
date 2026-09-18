@@ -95,9 +95,10 @@ one.
 ## Verify before calling a PR ready
 
 - Before opening or updating a PR that touches buildable/testable code
-  (anything under `src/` or `test/` — not a docs-only change like
-  `CLAUDE.md` or `README.md`), run `dotnet build` and `dotnet test`
-  locally first. Don't describe a change as ready without having done so.
+  (anything under any project's `*/src/` or `*/test/` — not a docs-only
+  change like `CLAUDE.md` or `README.md`), run `dotnet build` and
+  `dotnet test` locally first. Don't describe a change as ready without
+  having done so.
 - State that verification happened, and its result, in the PR description
   or to me directly, rather than leaving it implicit.
 - There's no CI configured on this repo yet, so this local check is
@@ -106,8 +107,9 @@ one.
 
 ## Tests accompany code changes
 
-- New or changed logic in `src/` should come with corresponding tests in
-  `test/` in the same PR, not as a follow-up. This covers new behavior,
+- New or changed logic in any project's `*/src/` should come with
+  corresponding tests in its `*/test/` in the same PR, not as a
+  follow-up. This covers new behavior,
   bug fixes (a regression test reproducing the bug), and non-trivial
   logic changes. Changes on the same scale as what already counts as
   "trivial" elsewhere in this file (typo fixes, formatting, internal
