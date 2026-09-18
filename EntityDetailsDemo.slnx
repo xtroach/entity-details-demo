@@ -1,0 +1,34 @@
+<Solution>
+  <Folder Name="/API/" />
+  <Folder Name="/API/src/">
+    <Project Path="API/src/EntityDetails.Api/EntityDetails.Api.csproj" />
+  </Folder>
+  <Folder Name="/API/test/">
+    <Project Path="API/test/EntityDetails.Api.Tests/EntityDetails.Api.Tests.csproj" />
+  </Folder>
+  <Folder Name="/ApiClient/" />
+  <Folder Name="/ApiClient/src/">
+    <Project Path="ApiClient/src/EntityDetails.ApiClient/EntityDetails.ApiClient.csproj" />
+  </Folder>
+  <Folder Name="/ApiClient/test/">
+    <Project Path="ApiClient/test/EntityDetails.ApiClient.Tests/EntityDetails.ApiClient.Tests.csproj" />
+  </Folder>
+  <Folder Name="/BlazorClient/" />
+  <Folder Name="/BlazorClient/src/">
+    <Project Path="BlazorClient/src/EntityDetails.BlazorClient/EntityDetails.BlazorClient.csproj" />
+  </Folder>
+  <Folder Name="/BlazorClient/test/">
+    <Project Path="BlazorClient/test/EntityDetails.BlazorClient.Tests/EntityDetails.BlazorClient.Tests.csproj" />
+  </Folder>
+  <Folder Name="/Contracts/" />
+  <Folder Name="/Contracts/src/">
+    <Project Path="Contracts/src/EntityDetails.Contracts/EntityDetails.Contracts.csproj" />
+  </Folder>
+  <Folder Name="/Data/" />
+  <Folder Name="/Data/src/">
+    <Project Path="Data/src/EntityDetails.Data/EntityDetails.Data.csproj" />
+  </Folder>
+  <Folder Name="/Data/test/">
+    <Project Path="Data/test/EntityDetails.Data.Tests/EntityDetails.Data.Tests.csproj" />
+  </Folder>
+</Solution>

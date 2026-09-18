@@ -39,6 +39,17 @@ ScaffoldingReadMe.txt
 # dotenv environment variables file
 .env
 
+# Local SQLite databases (e.g. the API's dev database)
+*.db
+*.db-shm
+*.db-wal
+
+# Visual Studio
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+
 # Others
 ~$*
 *~
