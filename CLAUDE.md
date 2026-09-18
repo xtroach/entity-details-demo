@@ -52,12 +52,12 @@ proceed — unless I've already declared one earlier in the conversation
 (e.g. by saying "scope this," "implement this," or "this is trivial"):
 
 - **Scope** — write up a GitHub issue (`gh issue create`) capturing the
-  decision: title, problem/context, the approach we landed on and the
-  reasoning behind it, relevant files/functions with paths, and any open
-  questions or risks. Write it with enough detail that implementing from
-  the issue alone, with no memory of this conversation, would produce
-  essentially the same change. Do not edit any files. Only start
-  implementing later when I explicitly reference the issue number.
+  decision, matching the shape in `.github/ISSUE_TEMPLATE/scope.md`
+  (problem/context, approach, relevant files, open questions/risks) to
+  the same detail bar: enough that implementing from the issue alone,
+  with no memory of this conversation, would produce essentially the
+  same change. Do not edit any files. Only start implementing later when
+  I explicitly reference the issue number.
 - **Implement** — write the same kind of issue first, to the same detail
   bar, then continue straight into implementing it in this same workflow
   — no waiting for me to separately reference the issue number.
@@ -77,7 +77,9 @@ one.
 - Never commit or push directly to `main` (or `master`), for any change,
   no matter how small.
 - All changes land on a feature branch, pushed, then opened as a pull
-  request (`gh pr create`). Give me the PR URL when it's ready.
+  request (`gh pr create`), following the shape in
+  `.github/pull_request_template.md` (summary, `Closes #N`, test plan).
+  Give me the PR URL when it's ready.
 - Do not merge, approve, or close the pull request yourself — that's my
   call. Opening it is the end of the task unless I explicitly ask you to
   merge it too.
