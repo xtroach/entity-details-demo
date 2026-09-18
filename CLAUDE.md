@@ -82,6 +82,24 @@ one.
   call. Opening it is the end of the task unless I explicitly ask you to
   merge it too.
 
+## Stacked pull requests
+
+- If a change depends on content that only exists on another open,
+  unmerged PR's branch, branch from that branch and set it as this PR's
+  base. State this explicitly in the PR description, along with the
+  required merge order (base-most branch merges last).
+- The moment a base PR merges, immediately rebase any still-open
+  dependent PR branches onto the branch it merged into (or onto `main`,
+  if nothing else sits between them) and update the dependent PR's base
+  explicitly — don't rely on GitHub's automatic base-retargeting, which
+  only fires if the merged branch is deleted, and isn't guaranteed to
+  happen.
+- After any stacked merge completes, verify the final content actually
+  landed in the target branch (e.g. diff it against what the top-most PR
+  was supposed to contain) rather than trusting the "Merged" label alone
+  — "Merged" only means that PR's diff reached its immediate base, not
+  that it survived the rest of the chain.
+
 ## Git history
 
 - Never rewrite already-pushed history — `rebase`, `commit --amend` on a
