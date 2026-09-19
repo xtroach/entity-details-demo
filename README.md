@@ -38,11 +38,17 @@ entity-details-demo/
 ├── docker-compose.yml     # Runs PostgreSQL, the API and the Blazor client together (full stack)
 ├── EntityDetailsDemo.slnx # Solution file referencing all 9 projects
 ├── EntityDetailsDemo.slnLaunch  # Shared VS multi-startup profile: API + Blazor client
+├── infra/                         # Azure infrastructure (Bicep), deployed per environment
+│   ├── main.bicep                 # Container Apps (API, client, migration job) + PostgreSQL Flexible Server
+│   ├── postgres-entra-admin.bicep # Module: one Entra principal as database admin
+│   ├── staging.bicepparam         # Staging's parameters (images come from API_IMAGE/CLIENT_IMAGE)
+│   └── bicepconfig.json           # Linter rules (unused params/vars etc. are errors)
 ├── Data/                          # EF Core data-access layer
 │   ├── src/EntityDetails.Data/
 │   │   ├── AppDbContext.cs        # The application's DbContext
 │   │   ├── AppDbContextOptions.cs # The one place the provider (Npgsql) is configured
 │   │   ├── ServiceCollectionExtensions.cs / ServiceProviderExtensions.cs  # AddEntityDetailsData, MigrateEntityDetailsDatabaseAsync
+│   │   ├── EntityDetailsDataOptions.cs / EntraAuthentication.cs  # Opt-in Entra ID (managed identity) login
 │   │   ├── AppDbContextDesignTimeFactory.cs  # Lets dotnet ef use Data as its own startup project
 │   │   ├── Entities/               # EF entities, one folder per entity
 │   │   │   └── WeatherForecast/WeatherForecast.cs
@@ -178,6 +184,40 @@ docker build -f Api/src/EntityDetails.Api/Dockerfile -t entitydetails-api .
 docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entitydetails-blazorclient .
 ```
 
+### Deploying (staging)
+Staging runs on Azure (see Architecture). `infra/main.bicep` defines
+everything in the environment's resource group. A few things exist outside
+Bicep and were created once, by hand, because the deployment itself depends
+on them. To set up another environment (e.g. production), repeat these
+steps with its own names:
+1. **Resource group** `rg-entitydetails-staging` in `germanywestcentral`,
+   with the providers `Microsoft.App`, `Microsoft.OperationalInsights`,
+   `Microsoft.DBforPostgreSQL` and `Microsoft.ManagedIdentity` registered.
+   The region was chosen because PostgreSQL's Burstable tier is available
+   there for this subscription.
+2. **GitHub's deploy identity:** the user-assigned managed identity
+   `id-entitydetails-github-staging` in that resource group. It has a
+   federated credential trusting only
+   `repo:xtroach/entity-details-demo:environment:staging` (GitHub OIDC; no
+   stored secret) and **Contributor on that resource group only**.
+   Deployments must stay in incremental mode, because a complete-mode
+   deployment would delete this identity, which isn't in the template.
+3. **GitHub Environment `staging`:** deployments from `main` only, no
+   required reviewers. Its variables `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`,
+   `AZURE_SUBSCRIPTION_ID` and `AZURE_RESOURCE_GROUP` point at the identity
+   and resource group. They're identifiers, not secrets.
+
+Preview what a deployment would change, without changing anything (needs
+`az login` with access to the resource group):
+```bash
+export API_IMAGE=ghcr.io/xtroach/entity-details-demo/api@sha256:<digest>
+export CLIENT_IMAGE=ghcr.io/xtroach/entity-details-demo/client@sha256:<digest>
+az deployment group what-if --resource-group rg-entitydetails-staging --parameters infra/staging.bicepparam
+```
+Set `POSTGRES_ADMIN_USER_OBJECT_ID` and `POSTGRES_ADMIN_USER_PRINCIPAL_NAME`
+as well to add your own Entra login as a second database admin, for
+debugging with `psql`.
+
 ## CodeConventions
 - Formatting and language conventions (indentation, brace style, `var` usage,
   file-scoped namespaces, etc.) are defined in `.editorconfig` and apply
@@ -244,6 +284,22 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
   unchanged. `Data` always turns off Npgsql's GSS (Kerberos) encryption,
   because the runtime image has no Kerberos library, and turns on retries
   for transient connection errors (see Architecture).
+- **Database** section (all optional; env vars `Database__…`):
+  - `UseEntraAuthentication` (default `false`) — sign in to PostgreSQL with
+    Microsoft Entra ID access tokens instead of a password (Azure Database
+    for PostgreSQL). The connection string's `Username` is then the Entra
+    principal's name (for a managed identity, its resource name), and it
+    must not contain a `Password`; the API refuses to start if it does.
+  - `ManagedIdentityClientId` — the user-assigned managed identity to get
+    tokens for. Without it, tokens come from the developer's own Azure
+    sign-in (`DefaultAzureCredential`, e.g. after `az login`).
+  - `MigrateOnStartup` (default `true`) — apply pending migrations when the
+    API starts. Deployments that run several instances set it to `false`
+    and run the migrate-only mode below once, before rollout.
+- **Command-line modes** of `EntityDetails.Api.dll`: `--migrate` applies
+  pending migrations with the normal configuration and exits (0 on
+  success, non-zero on failure); `--probe` is the container health probe
+  (see Health endpoints).
 - **Local database credentials** — the Compose `db` service uses
   `POSTGRES_HOST_AUTH_METHOD=trust` and publishes port 5432 on `127.0.0.1`
   only. That's why no connection string in the repository contains a
@@ -284,6 +340,16 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
 - **EntityDetailsDemo.slnLaunch**: the shared Visual Studio multi-startup
   profile (API and client, both on `https`). Personal profiles still go in
   the untracked `EntityDetailsDemo.slnLaunch.user`.
+- **Staging (Azure)** — set by `infra/main.bicep`, not by files in the
+  apps. The API and migration job get `ASPNETCORE_ENVIRONMENT=Staging` (no
+  seeding, no OpenAPI) and a password-less connection string
+  (`Username` = the API's managed identity, `Ssl Mode=Require`). They also
+  get `Database__UseEntraAuthentication=true`,
+  `Database__ManagedIdentityClientId`, `Database__MigrateOnStartup=false`,
+  and `BlazorClientOrigins__0` = the client's URL. The client gets
+  `API_BASE_URL` = the API's URL. `infra/staging.bicepparam` holds the
+  environment's values. The images come from `API_IMAGE`/`CLIENT_IMAGE` at
+  deploy time.
 - **User secrets** — `Api`'s project has a `UserSecretsId` configured for
   storing local secrets outside source control via `dotnet user-secrets`.
 
@@ -294,18 +360,27 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
   It also owns the database setup, following the same pattern as
   `ApiClient`'s `AddEntityDetailsApiClient(Uri)`: the host passes a plain
   value, and the library does the rest.
-  - `services.AddEntityDetailsData(connectionString)` registers
+  - `services.AddEntityDetailsData(connectionString, configure?)` registers
     `AppDbContext` for PostgreSQL. It turns on retries for the transient
     errors a managed database produces on failover, and turns off GSS
-    encryption.
+    encryption. All contexts share one `NpgsqlDataSource` (connection pool,
+    and access token when Entra is on).
   - `serviceProvider.MigrateEntityDetailsDatabaseAsync()` applies pending
     migrations. `Data` provides *how* to migrate, and the host decides
-    *when*: at startup today, in a deploy step once there's continuous
-    deployment.
-  - Both of these and `AppDbContextDesignTimeFactory` go through one
-    internal `AppDbContextOptions.Configure`. The provider is decided in one
-    place, next to the migrations that depend on it. A future engine change
-    doesn't touch `Api`'s code, only configuration values.
+    *when*: at startup by default, or as a separate deploy step
+    (`--migrate`, see Api).
+  - **Opt-in Microsoft Entra ID authentication**
+    (`EntityDetailsDataOptions.UseEntraAuthentication`). On Azure, the API
+    signs in to PostgreSQL with its managed identity, so no database
+    password exists anywhere. Npgsql refreshes the access token in the
+    background. It's opt-in so the skeleton stays portable: with the
+    default, a normal connection string works on any host. This is the
+    only Azure-specific code, and it lives in `Data` next to the provider
+    setup (`Azure.Identity` is the one Azure package).
+  - The runtime registration and `AppDbContextDesignTimeFactory` both go
+    through one internal `AppDbContextOptions`. The provider is decided in
+    one place, next to the migrations that depend on it. A future engine
+    change doesn't touch `Api`'s code, only configuration values.
   - `AppDbContextDesignTimeFactory` makes `Data` its own startup project for
     `dotnet ef`, so the migration tooling doesn't depend on the API's startup
     or configuration.
@@ -334,10 +409,13 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
   database provider. This holds by convention: Npgsql still reaches `Api`
   transitively, because `Data` needs it at runtime. `Program.cs` also
   registers a CORS policy for the Blazor client's origin, applies pending
-  migrations on startup (`MigrateEntityDetailsDatabaseAsync`), and seeds
-  sample data in Development only. Migrating at startup is safe while one
-  instance runs (Compose, local development). A multi-instance deployment
-  should apply migrations in a deploy step before rollout instead.
+  migrations on startup unless `Database:MigrateOnStartup` is `false`, and
+  seeds sample data in Development only. Migrating at startup is safe while
+  one instance runs (Compose, local development). A deployment with several
+  instances turns it off and runs the same image with `--migrate` once,
+  before rollout (a Container Apps Job in staging). That reuses the tested
+  image and its Entra login, with no separate migration tool, and the new
+  version only takes traffic once the schema is ready.
   `Controllers/WeatherForecastController` exposes full CRUD (`GET`,
   `GET/{id}`, `POST`, `PUT/{id}`, `DELETE/{id}`) in terms of
   `Contracts` types, not the EF entity directly; `Mapping/WeatherForecastMapper`
@@ -393,7 +471,9 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
   `Data.Tests` needs no database for any of its tests. It tests
   `AppDbContext` directly against InMemory, and checks that
   `AddEntityDetailsData` registers the Npgsql provider with GSS off and
-  retries on, and rejects an empty connection string. `MigrationsTests` fails
+  retries on, rejects an empty connection string or a password combined
+  with Entra authentication, and that the Entra credential and token scope
+  are chosen correctly (with a fake credential). `MigrationsTests` fails
   whenever the model has changes that no migration covers, by comparing the
   model with the snapshot. `ApiClient.Tests` fakes `HttpMessageHandler` to
   test the typed client in isolation; `BlazorClient.Tests` uses bUnit to
@@ -431,9 +511,13 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
 - **Health checks** follow ASP.NET Core's liveness/readiness split.
   Liveness (`/health/live`) runs no checks, so a slow or unavailable
   database never gets a healthy process restarted. Readiness
-  (`/health/ready`) runs EF Core's `DbContext` check (`CanConnectAsync`), so
-  an orchestrator only sends traffic to an instance that can reach the
-  database. Container Apps' probes in the staging deployment use these
+  (`/health/ready`) runs EF Core's `DbContext` check, so an orchestrator
+  only sends traffic to an instance that can reach the database. The check
+  opens a connection directly instead of calling `CanConnectAsync`: that
+  call goes through the retrying execution strategy, so with the database
+  down each readiness request would wait through every retry (over a
+  minute) instead of failing within the connection timeout. A test guards
+  this. Container Apps' probes in the staging deployment use these
   endpoints. Each image carries its own `HEALTHCHECK`, so every run of it
   reports health, not only Compose:
   - The API's runtime image has neither `curl` nor `wget`, so the API probes
@@ -444,11 +528,39 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
   - The client's Compose `depends_on: [api]` deliberately has no
     `condition: service_healthy`. The WebAssembly app calls the API from the
     browser, so the client container doesn't need a healthy API to start.
+- **Azure staging** (`infra/main.bicep`, one resource group per
+  environment):
+  - **Azure Container Apps** (Consumption workload profile) runs the API,
+    the client, and a migration job. The job runs the API image with
+    `--migrate`, manually triggered once per deploy, before rollout. Both
+    apps scale to zero when idle. Replicas are capped (API 2, client 1) as a
+    cost limit, because staging is an **open demo**: without authentication
+    (#20), anyone can create and delete data. The API's probes use
+    `/health/live` (startup, liveness) and `/health/ready` (readiness), so
+    a new revision only takes traffic once it can reach the database.
+  - **Azure Database for PostgreSQL Flexible Server** (PostgreSQL 18,
+    matching Compose and the tests; Burstable B1ms; 7-day backups) with
+    **password authentication disabled**. The API and the migration job
+    sign in with their user-assigned managed identity through the opt-in
+    Entra login in `Data`, so no database password exists anywhere. That
+    identity is the server's Entra admin, so the job can change the schema.
+    Production should split it into a migrator and a runtime identity with
+    data access only.
+  - The server's firewall admits Azure services, because Container Apps'
+    outbound addresses aren't fixed. Signing in still requires an Entra
+    token for an admin identity, over TLS. VNet integration would close
+    this at the network level, at extra cost and complexity; that's a
+    production decision.
+  - Each app's URL derives from the Container Apps environment's default
+    domain, so the API's CORS origin and the client's `API_BASE_URL`
+    reference each other without a dependency cycle.
+  - Logs go to a Log Analytics workspace (30-day retention).
 - **CI** (`.github/workflows/ci.yml`) runs on every pull request to `main`,
   every push to `main`, and on demand. Its first two jobs are also the
   required status checks on `main`:
   - **Build and test** (Ubuntu). It checks that every committed file is LF
-    and has no BOM, then verifies formatting, builds in Release (warnings
+    and has no BOM, compiles and lints the Bicep templates in `infra/`
+    (no Azure login), then verifies formatting, builds in Release (warnings
     are errors), and runs every test in the solution (`Api.Tests` uses the
     runner's Docker engine for its PostgreSQL container). Any failing test fails
     the job. The test results (TRX) and coverage are uploaded as an artifact
@@ -492,6 +604,8 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
     Dependabot doesn't update it there, so a Compose image bump has to be
     copied into it by hand;
   - `dotnet-ef` in `.config/dotnet-tools.json`;
+  - the Bicep CLI in CI's "Validate Bicep" step (`az bicep install
+    --version`). Dependabot doesn't track it, so it's updated by hand;
   - actions by commit SHA.
 
   Dependabot (`.github/dependabot.yml`) keeps them current with grouped

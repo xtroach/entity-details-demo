@@ -63,6 +63,35 @@ public class ServiceCollectionExtensionsTests
         Assert.Throws<ArgumentNullException>(() => services.AddEntityDetailsData(null!));
     }
 
+    [Fact]
+    public void AddEntityDetailsData_Throws_WhenEntraAuthenticationIsCombinedWithPassword()
+    {
+        var services = new ServiceCollection();
+
+        var exception = Assert.Throws<ArgumentException>(() => services.AddEntityDetailsData(
+            ConnectionString + ";Password=secret", options => options.UseEntraAuthentication = true));
+        Assert.Contains("password", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AddEntityDetailsData_WithEntraAuthentication_RegistersNpgsqlContextWithoutPassword()
+    {
+        using var services = new ServiceCollection()
+            .AddEntityDetailsData(ConnectionString, options =>
+            {
+                options.UseEntraAuthentication = true;
+                options.TokenCredential = new EntraAuthenticationTests.FakeTokenCredential();
+            })
+            .BuildServiceProvider();
+        using var scope = services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var connectionString = new NpgsqlConnectionStringBuilder(dbContext.Database.GetConnectionString());
+        Assert.Equal("Npgsql.EntityFrameworkCore.PostgreSQL", dbContext.Database.ProviderName);
+        Assert.Null(connectionString.Password);
+        Assert.Equal(GssEncryptionMode.Disable, connectionString.GssEncryptionMode);
+    }
+
     private static ServiceProvider BuildServices() =>
         new ServiceCollection().AddEntityDetailsData(ConnectionString).BuildServiceProvider();
 }
