@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Smoke-tests the Docker Compose stack after `docker compose up -d` from the repository root: the API
-# serves seeded data, and the client serves its host page, falls back to it for client-side routes,
-# and has had API_BASE_URL applied by its entrypoint hook. Used by CI (.github/workflows/ci.yml) and
-# runnable locally with the same command. Exits non-zero on the first failed check.
+# reports ready (database reachable) and serves seeded data, and the client serves its host page,
+# falls back to it for client-side routes, and has had API_BASE_URL applied by its entrypoint hook.
+# Used by CI (.github/workflows/ci.yml) and runnable locally with the same command. Exits non-zero on
+# the first failed check.
 set -euo pipefail
 
 api_url="${API_URL:-http://localhost:5080}"
@@ -23,6 +24,9 @@ expect() {
         exit 1
     fi
 }
+
+expect "API is ready (database reachable)" \
+    "$api_url/health/ready" 'Healthy'
 
 expect "API returns seeded forecasts" \
     "$api_url/weatherforecast" '"temperatureC"'

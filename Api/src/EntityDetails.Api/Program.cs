@@ -1,5 +1,6 @@
 using EntityDetails.Data;
 using EntityDetails.Data.Entities;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 
 namespace EntityDetails.Api;
 
@@ -10,11 +11,16 @@ public class Program
 {
     private const string BlazorClientCorsPolicy = "BlazorClient";
 
+    private const string ReadyTag = "ready";
+
     /// <summary>
-    /// Configures and starts the web application.
+    /// Configures and starts the web application, or runs the container health probe.
     /// </summary>
-    /// <param name="args">The command-line arguments passed to the process.</param>
-    /// <returns>A task that completes when the application shuts down.</returns>
+    /// <param name="args">
+    /// The command-line arguments passed to the process. <c>--probe</c> alone runs
+    /// <see cref="HealthProbe"/> against the running API instead of starting it.
+    /// </param>
+    /// <returns>The process exit code: 0 after a normal shutdown or a healthy probe; 1 for an unhealthy probe.</returns>
     /// <exception cref="InvalidOperationException">
     /// The <c>ConnectionStrings:AppDbContext</c> setting is missing.
     /// </exception>
@@ -23,8 +29,15 @@ public class Program
     /// (Docker Compose, local development). A multi-instance deployment should apply them in a
     /// deploy step before rollout instead.
     /// </remarks>
-    public static async Task Main(string[] args)
+    public static async Task<int> Main(string[] args)
     {
+        if (args is [HealthProbe.Argument])
+        {
+            using var client = new HttpClient { Timeout = HealthProbe.Timeout };
+            var liveUri = HealthProbe.CreateLiveUri(Environment.GetEnvironmentVariable("ASPNETCORE_HTTP_PORTS"));
+            return await HealthProbe.RunAsync(client, liveUri, CancellationToken.None);
+        }
+
         var builder = WebApplication.CreateBuilder(args);
 
         // Add services to the container.
@@ -38,6 +51,11 @@ public class Program
             ?? throw new InvalidOperationException(
                 "The connection string 'ConnectionStrings:AppDbContext' is not configured.");
         builder.Services.AddEntityDetailsData(connectionString);
+
+        // Liveness runs no checks (the process answers); readiness checks the database. Only
+        // checks tagged "ready" run on /health/ready.
+        builder.Services.AddHealthChecks()
+            .AddDbContextCheck<AppDbContext>(tags: [ReadyTag]);
 
         var blazorClientOrigins = builder.Configuration.GetSection("BlazorClientOrigins").Get<string[]>()
             ?? ["https://localhost:7137", "http://localhost:5286"];
@@ -72,7 +90,11 @@ public class Program
 
         app.MapControllers();
 
+        app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
+        app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains(ReadyTag) });
+
         await app.RunAsync();
+        return 0;
     }
 
     private static void SeedDevelopmentData(AppDbContext dbContext)

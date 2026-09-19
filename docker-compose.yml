@@ -58,6 +58,8 @@ services:
       - "8080:8080"
     environment:
       API_BASE_URL: http://localhost:5080
+    # Deliberately no "condition: service_healthy": the WebAssembly app calls the API from the
+    # browser, not from this container, so the client can start before the API is healthy.
     depends_on:
       - api
 

@@ -36,4 +36,7 @@ RUN dotnet publish "./EntityDetails.Api.csproj" -c $BUILD_CONFIGURATION -o /app/
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+# The runtime image has no curl or wget, so the API probes itself: --probe requests /health/live and
+# exits 0 (healthy) or 1 (unhealthy). See HealthProbe.cs.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=5 CMD ["dotnet", "EntityDetails.Api.dll", "--probe"]
 ENTRYPOINT ["dotnet", "EntityDetails.Api.dll"]

@@ -28,3 +28,5 @@ COPY BlazorClient/src/EntityDetails.BlazorClient/docker-entrypoint.d/40-api-base
 RUN sed -i 's/\r$//' /docker-entrypoint.d/40-api-base-url.sh && chmod +x /docker-entrypoint.d/40-api-base-url.sh
 COPY --from=publish /app/publish/wwwroot /usr/share/nginx/html
 EXPOSE 8080
+# busybox wget ships with nginx:alpine.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=5 CMD wget -q --spider http://127.0.0.1:8080/ || exit 1
