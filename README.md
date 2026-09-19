@@ -205,11 +205,20 @@ everything in the environment's resource group. A few things exist outside
 Bicep and were created once, by hand, because the deployment itself depends
 on them. To set up another environment (e.g. production), repeat these
 steps with its own names:
-1. **Resource group** `rg-entitydetails-staging` in `germanywestcentral`,
-   with the providers `Microsoft.App`, `Microsoft.OperationalInsights`,
+1. **Resource group** `rg-entitydetails-staging` (its own region,
+   `germanywestcentral`, is only metadata), with the providers
+   `Microsoft.App`, `Microsoft.OperationalInsights`,
    `Microsoft.DBforPostgreSQL` and `Microsoft.ManagedIdentity` registered.
-   The region was chosen because PostgreSQL's Burstable tier is available
-   there for this subscription.
+   The resources themselves run in **`swedencentral`**, set by `location` in
+   `infra/staging.bicepparam`. Azure restricts PostgreSQL Flexible Server
+   provisioning per region and subscription, and these restrictions change
+   over time (Free Trial subscriptions first). `germanywestcentral` became
+   restricted between setup and the first deployment. Before choosing or
+   changing a region, check that
+   `az postgres flexible-server list-skus --location <region>` reports
+   `OfferRestricted: Disabled`. Moving an existing environment means
+   deleting its resources first, because names are unique within a
+   resource group regardless of region.
 2. **GitHub's deploy identity:** the user-assigned managed identity
    `id-entitydetails-github-staging` in that resource group. It has a
    federated credential trusting only
