@@ -3,9 +3,10 @@ root = true
 # All files
 [*]
 indent_style = space
+end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
-charset = utf-8-bom
+charset = utf-8
 
 [*.{cs,vb}]
 indent_size = 4
@@ -25,6 +26,7 @@ trim_trailing_whitespace = false
 [*.{cmd,bat}]
 end_of_line = crlf
 
+# Shell scripts run inside Linux containers, where CRLF line endings break the shebang line.
 [*.sh]
 end_of_line = lf
 
