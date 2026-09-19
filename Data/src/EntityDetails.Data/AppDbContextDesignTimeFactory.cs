@@ -27,10 +27,15 @@ public class AppDbContextDesignTimeFactory : IDesignTimeDbContextFactory<AppDbCo
     /// </summary>
     /// <param name="args">Arguments passed by the design-time tools; not used.</param>
     /// <returns>A new <see cref="AppDbContext"/> using the Npgsql provider.</returns>
+    /// <remarks>
+    /// The data source isn't disposed with the context. Design-time commands are short-lived
+    /// processes, so its connection pool ends with them.
+    /// </remarks>
     public AppDbContext CreateDbContext(string[] args)
     {
         var options = new DbContextOptionsBuilder<AppDbContext>();
-        AppDbContextOptions.Configure(options, LocalConnectionString);
+        AppDbContextOptions.Configure(
+            options, AppDbContextOptions.CreateDataSource(LocalConnectionString, new EntityDetailsDataOptions()));
 
         return new AppDbContext(options.Options);
     }

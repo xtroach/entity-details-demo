@@ -48,6 +48,7 @@ entity-details-demo/
 │   │   ├── AppDbContext.cs        # The application's DbContext
 │   │   ├── AppDbContextOptions.cs # The one place the provider (Npgsql) is configured
 │   │   ├── ServiceCollectionExtensions.cs / ServiceProviderExtensions.cs  # AddEntityDetailsData, MigrateEntityDetailsDatabaseAsync
+│   │   ├── EntityDetailsDataOptions.cs / EntraAuthentication.cs  # Opt-in Entra ID (managed identity) login
 │   │   ├── AppDbContextDesignTimeFactory.cs  # Lets dotnet ef use Data as its own startup project
 │   │   ├── Entities/               # EF entities, one folder per entity
 │   │   │   └── WeatherForecast/WeatherForecast.cs
@@ -283,6 +284,22 @@ debugging with `psql`.
   unchanged. `Data` always turns off Npgsql's GSS (Kerberos) encryption,
   because the runtime image has no Kerberos library, and turns on retries
   for transient connection errors (see Architecture).
+- **Database** section (all optional; env vars `Database__…`):
+  - `UseEntraAuthentication` (default `false`) — sign in to PostgreSQL with
+    Microsoft Entra ID access tokens instead of a password (Azure Database
+    for PostgreSQL). The connection string's `Username` is then the Entra
+    principal's name (for a managed identity, its resource name), and it
+    must not contain a `Password`; the API refuses to start if it does.
+  - `ManagedIdentityClientId` — the user-assigned managed identity to get
+    tokens for. Without it, tokens come from the developer's own Azure
+    sign-in (`DefaultAzureCredential`, e.g. after `az login`).
+  - `MigrateOnStartup` (default `true`) — apply pending migrations when the
+    API starts. Deployments that run several instances set it to `false`
+    and run the migrate-only mode below once, before rollout.
+- **Command-line modes** of `EntityDetails.Api.dll`: `--migrate` applies
+  pending migrations with the normal configuration and exits (0 on
+  success, non-zero on failure); `--probe` is the container health probe
+  (see Health endpoints).
 - **Local database credentials** — the Compose `db` service uses
   `POSTGRES_HOST_AUTH_METHOD=trust` and publishes port 5432 on `127.0.0.1`
   only. That's why no connection string in the repository contains a
@@ -343,18 +360,27 @@ debugging with `psql`.
   It also owns the database setup, following the same pattern as
   `ApiClient`'s `AddEntityDetailsApiClient(Uri)`: the host passes a plain
   value, and the library does the rest.
-  - `services.AddEntityDetailsData(connectionString)` registers
+  - `services.AddEntityDetailsData(connectionString, configure?)` registers
     `AppDbContext` for PostgreSQL. It turns on retries for the transient
     errors a managed database produces on failover, and turns off GSS
-    encryption.
+    encryption. All contexts share one `NpgsqlDataSource` (connection pool,
+    and access token when Entra is on).
   - `serviceProvider.MigrateEntityDetailsDatabaseAsync()` applies pending
     migrations. `Data` provides *how* to migrate, and the host decides
-    *when*: at startup today, in a deploy step once there's continuous
-    deployment.
-  - Both of these and `AppDbContextDesignTimeFactory` go through one
-    internal `AppDbContextOptions.Configure`. The provider is decided in one
-    place, next to the migrations that depend on it. A future engine change
-    doesn't touch `Api`'s code, only configuration values.
+    *when*: at startup by default, or as a separate deploy step
+    (`--migrate`, see Api).
+  - **Opt-in Microsoft Entra ID authentication**
+    (`EntityDetailsDataOptions.UseEntraAuthentication`). On Azure, the API
+    signs in to PostgreSQL with its managed identity, so no database
+    password exists anywhere. Npgsql refreshes the access token in the
+    background. It's opt-in so the skeleton stays portable: with the
+    default, a normal connection string works on any host. This is the
+    only Azure-specific code, and it lives in `Data` next to the provider
+    setup (`Azure.Identity` is the one Azure package).
+  - The runtime registration and `AppDbContextDesignTimeFactory` both go
+    through one internal `AppDbContextOptions`. The provider is decided in
+    one place, next to the migrations that depend on it. A future engine
+    change doesn't touch `Api`'s code, only configuration values.
   - `AppDbContextDesignTimeFactory` makes `Data` its own startup project for
     `dotnet ef`, so the migration tooling doesn't depend on the API's startup
     or configuration.
@@ -383,10 +409,13 @@ debugging with `psql`.
   database provider. This holds by convention: Npgsql still reaches `Api`
   transitively, because `Data` needs it at runtime. `Program.cs` also
   registers a CORS policy for the Blazor client's origin, applies pending
-  migrations on startup (`MigrateEntityDetailsDatabaseAsync`), and seeds
-  sample data in Development only. Migrating at startup is safe while one
-  instance runs (Compose, local development). A multi-instance deployment
-  should apply migrations in a deploy step before rollout instead.
+  migrations on startup unless `Database:MigrateOnStartup` is `false`, and
+  seeds sample data in Development only. Migrating at startup is safe while
+  one instance runs (Compose, local development). A deployment with several
+  instances turns it off and runs the same image with `--migrate` once,
+  before rollout (a Container Apps Job in staging). That reuses the tested
+  image and its Entra login, with no separate migration tool, and the new
+  version only takes traffic once the schema is ready.
   `Controllers/WeatherForecastController` exposes full CRUD (`GET`,
   `GET/{id}`, `POST`, `PUT/{id}`, `DELETE/{id}`) in terms of
   `Contracts` types, not the EF entity directly; `Mapping/WeatherForecastMapper`
@@ -442,7 +471,9 @@ debugging with `psql`.
   `Data.Tests` needs no database for any of its tests. It tests
   `AppDbContext` directly against InMemory, and checks that
   `AddEntityDetailsData` registers the Npgsql provider with GSS off and
-  retries on, and rejects an empty connection string. `MigrationsTests` fails
+  retries on, rejects an empty connection string or a password combined
+  with Entra authentication, and that the Entra credential and token scope
+  are chosen correctly (with a fake credential). `MigrationsTests` fails
   whenever the model has changes that no migration covers, by comparing the
   model with the snapshot. `ApiClient.Tests` fakes `HttpMessageHandler` to
   test the typed client in isolation; `BlazorClient.Tests` uses bUnit to
@@ -480,9 +511,13 @@ debugging with `psql`.
 - **Health checks** follow ASP.NET Core's liveness/readiness split.
   Liveness (`/health/live`) runs no checks, so a slow or unavailable
   database never gets a healthy process restarted. Readiness
-  (`/health/ready`) runs EF Core's `DbContext` check (`CanConnectAsync`), so
-  an orchestrator only sends traffic to an instance that can reach the
-  database. Container Apps' probes in the staging deployment use these
+  (`/health/ready`) runs EF Core's `DbContext` check, so an orchestrator
+  only sends traffic to an instance that can reach the database. The check
+  opens a connection directly instead of calling `CanConnectAsync`: that
+  call goes through the retrying execution strategy, so with the database
+  down each readiness request would wait through every retry (over a
+  minute) instead of failing within the connection timeout. A test guards
+  this. Container Apps' probes in the staging deployment use these
   endpoints. Each image carries its own `HEALTHCHECK`, so every run of it
   reports health, not only Compose:
   - The API's runtime image has neither `curl` nor `wget`, so the API probes
