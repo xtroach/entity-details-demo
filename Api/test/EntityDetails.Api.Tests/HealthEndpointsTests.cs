@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -34,9 +35,13 @@ public class HealthEndpointsTests(PostgresFixture postgres)
             .UseSetting("Database:MigrateOnStartup", "false"));
         using var client = factory.CreateClient();
 
+        var stopwatch = Stopwatch.StartNew();
         var ready = await client.GetAsync("/health/ready");
+        stopwatch.Stop();
         var live = await client.GetAsync("/health/live");
 
+        // Regression guard: going through EF's retrying execution strategy took over a minute here.
+        Assert.True(stopwatch.Elapsed < TimeSpan.FromSeconds(10), $"Readiness took {stopwatch.Elapsed}.");
         Assert.Equal(HttpStatusCode.ServiceUnavailable, ready.StatusCode);
         Assert.Equal("Unhealthy", await ready.Content.ReadAsStringAsync());
         Assert.Equal(HttpStatusCode.OK, live.StatusCode);
