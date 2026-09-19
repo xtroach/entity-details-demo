@@ -34,6 +34,8 @@ RUN dotnet publish "./EntityDetails.Api.csproj" -c $BUILD_CONFIGURATION -o /app/
 
 # This stage is used in production or when running from VS in regular mode (Default when not using the Debug configuration)
 FROM base AS final
+# Links the published GHCR package to this repository (shown on the repo page; lets its workflows push).
+LABEL org.opencontainers.image.source="https://github.com/xtroach/entity-details-demo"
 WORKDIR /app
 COPY --from=publish /app/publish .
 # The runtime image has no curl or wget, so the API probes itself: --probe requests /health/live and

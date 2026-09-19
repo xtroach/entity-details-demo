@@ -23,6 +23,8 @@ RUN dotnet publish "./EntityDetails.BlazorClient.csproj" -c $BUILD_CONFIGURATION
 # This stage serves the published wwwroot. API_BASE_URL, when set, overrides the ApiBaseUrl the
 # browser reads from appsettings.json (see docker-entrypoint.d/40-api-base-url.sh).
 FROM nginx:alpine@sha256:62ff2089abf5a9ed33bd232895bef5e22f7bb4b200675cec49a5ebc48e3d4ac8 AS final
+# Links the published GHCR package to this repository (shown on the repo page; lets its workflows push).
+LABEL org.opencontainers.image.source="https://github.com/xtroach/entity-details-demo"
 COPY BlazorClient/src/EntityDetails.BlazorClient/nginx.conf /etc/nginx/conf.d/default.conf
 COPY BlazorClient/src/EntityDetails.BlazorClient/docker-entrypoint.d/40-api-base-url.sh /docker-entrypoint.d/
 RUN sed -i 's/\r$//' /docker-entrypoint.d/40-api-base-url.sh && chmod +x /docker-entrypoint.d/40-api-base-url.sh
