@@ -11,27 +11,38 @@ namespace EntityDetails.Api.Tests;
 /// </summary>
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
-    private readonly string connectionString;
+    private readonly IReadOnlyDictionary<string, string?> settings;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CustomWebApplicationFactory"/> class.
     /// </summary>
     /// <param name="postgres">The shared PostgreSQL container to create this factory's database in.</param>
-    public CustomWebApplicationFactory(PostgresFixture postgres)
+    /// <param name="settings">Extra configuration settings for the API, e.g. <c>Database:MigrateOnStartup</c>.</param>
+    public CustomWebApplicationFactory(PostgresFixture postgres, IReadOnlyDictionary<string, string?>? settings = null)
     {
         // A unique database per factory instance keeps tests isolated from each other. Migrate()
         // creates it on startup.
-        connectionString = new NpgsqlConnectionStringBuilder(postgres.ConnectionString)
+        ConnectionString = new NpgsqlConnectionStringBuilder(postgres.ConnectionString)
         {
             Database = $"entitydetails_tests_{Guid.NewGuid():N}",
         }.ConnectionString;
+        this.settings = settings ?? new Dictionary<string, string?>();
     }
+
+    /// <summary>
+    /// The connection string of this factory's own database.
+    /// </summary>
+    public string ConnectionString { get; }
 
     /// <inheritdoc/>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // Not "Development", so Program's dev-only seed data doesn't populate the test database.
         builder.UseEnvironment("Testing");
-        builder.UseSetting("ConnectionStrings:AppDbContext", connectionString);
+        builder.UseSetting("ConnectionStrings:AppDbContext", ConnectionString);
+        foreach (var (key, value) in settings)
+        {
+            builder.UseSetting(key, value);
+        }
     }
 }
