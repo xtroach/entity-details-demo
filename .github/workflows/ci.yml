@@ -127,7 +127,7 @@ jobs:
         run: docker compose up --detach
 
       - name: Smoke test
-        run: bash .github/scripts/compose-smoke-test.sh
+        run: bash .github/scripts/smoke-test.sh
 
       - name: Show container logs
         if: ${{ failure() }}
@@ -201,3 +201,45 @@ jobs:
           echo "### Published images" >> "$GITHUB_STEP_SUMMARY"
           push entitydetails-api api api-image
           push entitydetails-blazorclient client client-image
+
+  deploy-staging:
+    name: Deploy to staging
+    # Deploys exactly the digests the publish job pushed. Main only; the staging environment also only
+    # accepts deployments from main, and its Azure identity only trusts this environment.
+    needs: publish
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    environment:
+      name: staging
+      url: ${{ steps.deploy.outputs.client-url }}
+    # One deploy at a time. A newer merge waits rather than cancelling a deploy halfway; if several
+    # queue up, only the newest waiting one runs.
+    concurrency:
+      group: deploy-staging
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      id-token: write # OIDC sign-in to Azure; no stored secret
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # Same pinned Bicep CLI as the "Validate Bicep" step.
+      - name: Install Bicep
+        run: az bicep install --version v0.47.16
+
+      - name: Deploy
+        id: deploy
+        env:
+          AZURE_RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+          API_IMAGE: ${{ needs.publish.outputs.api-image }}
+          CLIENT_IMAGE: ${{ needs.publish.outputs.client-image }}
+        run: bash .github/scripts/deploy-staging.sh

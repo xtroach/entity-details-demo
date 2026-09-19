@@ -26,8 +26,8 @@ entity-details-demo/
 ├── .editorconfig          # Repo-wide formatting and analyzer (StyleCop) rules
 ├── .gitattributes         # Line-ending policy: LF on every OS (CRLF only for .cmd/.bat)
 ├── .github/
-│   ├── workflows/ci.yml   # CI: build, format, test, Docker build and smoke test on every PR; publishes images on main
-│   ├── scripts/           # Helpers CI runs (Compose smoke test, test-result summary); also runnable locally
+│   ├── workflows/ci.yml   # CI on every PR; on main also publishes the images and deploys to staging
+│   ├── scripts/           # Helpers CI runs (smoke test, staging deploy, test-result summary); also runnable locally
 │   ├── dependabot.yml     # Weekly version updates: NuGet, base and Compose images, actions, SDK
 │   └── ISSUE_TEMPLATE/, pull_request_template.md
 ├── CLAUDE.md              # Documentation and coding-standard requirements
@@ -185,6 +185,21 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
 ```
 
 ### Deploying (staging)
+**Every merge to `main` deploys to staging automatically,** after CI has
+built, tested and published the images (CI's "Deploy to staging" job; see
+Architecture). There's nothing to run by hand:
+- **Where it is:** the repository's **Environments → staging** page links
+  the current client URL. The deploy job's run summary lists the client
+  and API URLs, the deployed image digests and the migration job's result.
+- **Rolling back:** re-run the "Deploy to staging" job of an earlier,
+  successful run from the Actions tab. It redeploys that run's image
+  digests. Migrations only go forward, so rolling back across a schema
+  change needs the older code to work with the newer schema (or a new
+  migration that reverses it).
+- **Deploying by hand** (e.g. to test the script): after `az login`, run
+  `AZURE_RESOURCE_GROUP=rg-entitydetails-staging API_IMAGE=… CLIENT_IMAGE=… bash .github/scripts/deploy-staging.sh`
+  from the repository root, with images by digest from GHCR.
+
 Staging runs on Azure (see Architecture). `infra/main.bicep` defines
 everything in the environment's resource group. A few things exist outside
 Bicep and were created once, by hand, because the deployment itself depends
@@ -568,11 +583,12 @@ debugging with `psql`.
     reported for now; a gate is #23's decision.
   - **Docker build and smoke test** runs only after the first job passes.
     It builds both images with Compose, starts the stack (including
-    PostgreSQL), and runs `.github/scripts/compose-smoke-test.sh`. The
-    script checks that the API reports ready and returns seeded data
-    (which proves the database, migrations and seeding end to end), and
-    that the client serves its page, falls back to it for client-side
-    routes, and applied `API_BASE_URL`. Run the script locally after
+    PostgreSQL), and runs `.github/scripts/smoke-test.sh`. The script
+    checks that the API reports ready, returns seeded data and completes a
+    create/read/delete round trip (which proves the database, migrations
+    and seeding end to end, and leaves no data behind). It also checks that
+    the client serves its page, falls back to it for client-side routes,
+    and applied `API_BASE_URL`. Run the script locally after
     `docker compose up -d` to get the same checks. On `main` it then saves
     the two images it just tested as a short-lived artifact.
   - **Publish images** runs only after a merge to `main` (never on PRs, so
@@ -588,12 +604,37 @@ debugging with `psql`.
     `org.opencontainers.image.source` label, which links the packages to
     this repository. Container Apps pulls them without credentials, so the
     packages are public.
+  - **Deploy to staging** runs after the publish job, on `main` only, in
+    the `staging` GitHub Environment. It signs in to Azure through OIDC
+    (`azure/login`; the environment's variables name the identity) and runs
+    `.github/scripts/deploy-staging.sh` with the published digests. The
+    script works in four steps, so the running version keeps serving until
+    the new one is proven:
+    1. **Converge the infrastructure** (`infra/main.bicep`, incremental
+       mode) while keeping the *currently running* images. Configuration
+       and infrastructure changes apply; the running code doesn't change.
+    2. **Migrate:** point the migration job at the *new* API image, run it
+       (`--migrate`), and wait. If it fails or times out, the deploy stops
+       and the old version keeps running.
+    3. **Roll out** the new API and client images. Each new revision takes
+       traffic only once its readiness probe passes, i.e. it can reach the
+       migrated database.
+    4. **Smoke-test the live URLs** with `smoke-test.sh`
+       (`EXPECT_SEEDED_DATA=false`, because `Staging` isn't seeded).
+
+    Migrations run *before* the rollout, so new code never meets an old
+    schema. The next deploy of older code only works if a migration is
+    backward compatible, which is the usual expand-then-contract
+    discipline. Deploys run one at a time (a `concurrency` group that
+    doesn't cancel a deploy halfway), and the job isn't a required check,
+    because it runs after merge.
 
   CI runs on Linux only: that catches case-sensitivity bugs Windows hides,
   and local verification covers Windows. The workflow's default
-  permissions are read-only. Only the publish job gets `packages: write`,
-  and only on `main`. Its actions are pinned to commit SHAs, because a tag
-  can be moved to different code.
+  permissions are read-only. Only the publish job gets `packages: write`
+  and only the deploy job gets `id-token: write`, both only on `main`. Its
+  actions are pinned to commit SHAs, because a tag can be moved to
+  different code.
 - **Pinned versions.** Builds are reproducible because every input is
   pinned:
   - the SDK in `global.json`;
@@ -604,8 +645,9 @@ debugging with `psql`.
     Dependabot doesn't update it there, so a Compose image bump has to be
     copied into it by hand;
   - `dotnet-ef` in `.config/dotnet-tools.json`;
-  - the Bicep CLI in CI's "Validate Bicep" step (`az bicep install
-    --version`). Dependabot doesn't track it, so it's updated by hand;
+  - the Bicep CLI in CI's "Validate Bicep" and "Install Bicep" steps
+    (`az bicep install --version`; keep both the same). Dependabot doesn't
+    track it, so it's updated by hand;
   - actions by commit SHA.
 
   Dependabot (`.github/dependabot.yml`) keeps them current with grouped
@@ -640,6 +682,16 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   they've finished. The assistant also runs `dotnet build`/`dotnet test`
   locally before opening a PR, and states the result in the PR's test
   plan.
+- **Every merge deploys to staging, without stored credentials.** After CI
+  passes on `main`, the images it tested are published and deployed to the
+  Azure staging environment by digest, migrated before rollout and
+  smoke-tested live. GitHub signs in to Azure through OIDC, so no Azure
+  secret is stored anywhere. The `staging` GitHub Environment only accepts
+  deployments from `main`, and its Azure identity only trusts that
+  environment and can only change staging's resource group. The staging
+  database has no password at all; the API uses its managed identity.
+  Production will be a separate environment behind a manual approval gate,
+  promoting the digests staging validated.
 - **Supply-chain and secrets hygiene is on by default.** Dependabot
   security updates and weekly version updates, CodeQL code scanning
   (GitHub's default setup), secret scanning, and push protection are
