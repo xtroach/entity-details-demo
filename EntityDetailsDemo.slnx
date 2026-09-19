@@ -1,10 +1,10 @@
 <Solution>
-  <Folder Name="/API/" />
-  <Folder Name="/API/src/">
-    <Project Path="API/src/EntityDetails.Api/EntityDetails.Api.csproj" />
+  <Folder Name="/Api/" />
+  <Folder Name="/Api/src/">
+    <Project Path="Api/src/EntityDetails.Api/EntityDetails.Api.csproj" />
   </Folder>
-  <Folder Name="/API/test/">
-    <Project Path="API/test/EntityDetails.Api.Tests/EntityDetails.Api.Tests.csproj" />
+  <Folder Name="/Api/test/">
+    <Project Path="Api/test/EntityDetails.Api.Tests/EntityDetails.Api.Tests.csproj" />
   </Folder>
   <Folder Name="/ApiClient/" />
   <Folder Name="/ApiClient/src/">
