@@ -108,9 +108,13 @@ one.
   having done so.
 - State that verification happened, and its result, in the PR description
   or to me directly, rather than leaving it implicit.
-- There's no CI configured on this repo yet, so this local check is
-  currently the only gate. Once CI exists (see #12), this rule should
-  also require it green before a PR is called ready (see #13).
+- Local verification comes first, but a PR is only ready once CI
+  (`.github/workflows/ci.yml`) is green on it. Its jobs ("Build and
+  test", "Docker build and smoke test") are required status checks on
+  `main`, so GitHub blocks merging while either is red or still running.
+  If CI fails, fix the cause and push again. Never call a PR ready
+  with a red or pending run, and don't work around a failing check
+  (skipping tests, loosening a check) without asking first.
 
 ## Tests accompany code changes
 
@@ -123,11 +127,11 @@ one.
   refactors with no external effect) don't need a dedicated test.
 - If it's genuinely unclear whether a change needs a test, flag it and
   ask rather than silently deciding either way.
-- This is currently a self-enforced expectation, not a measured gate —
-  there's no CI or coverage tooling wired up yet (#12). Once #23 (test
-  coverage gates) lands, this rule should be reconciled with whatever
-  gate that issue settles on, rather than left as a separate parallel
-  rule.
+- This is currently a self-enforced expectation, not a measured gate.
+  CI runs every test and collects coverage, but only reports it. Once
+  #23 (test coverage gates) lands, this rule should be reconciled with
+  whatever gate that issue settles on, rather than left as a separate
+  parallel rule.
 
 ## Stacked pull requests
 
@@ -171,10 +175,22 @@ one.
 - Flag it before adding a new package or upgrading an existing one's
   version, rather than doing it silently mid-task. Note anything relevant
   (license, major version jump, why it's needed).
-- This applies to direct `PackageReference` additions/upgrades only (in
-  any project's `*/src/` or `*/test/`) — not to transitive packages that
-  come along with one. A transitive package isn't an independent
-  decision; it's a consequence of whatever direct package pulled it in.
+- This applies to direct package additions/upgrades only — not to
+  transitive packages that come along with one. A transitive package
+  isn't an independent decision; it's a consequence of whatever direct
+  package pulled it in.
+- Versions are managed centrally: a package's version lives only in the
+  root `Directory.Packages.props` (`<PackageVersion>`), and projects
+  reference it without a version (`<PackageReference Include="..." />`).
+  Adding a package means both; upgrading one means changing only
+  `Directory.Packages.props`. Never put a `Version` on a
+  `PackageReference`.
+- The same applies to the other pinned versions: the SDK in
+  `global.json`, base-image digests in the Dockerfiles, and action SHAs
+  in `.github/workflows/`.
+- Dependabot opens weekly version-update PRs for all of these
+  (`.github/dependabot.yml`). Those are the owner's to review and merge.
+  Don't merge, close, or rewrite them unasked.
 
 ## Secrets and credentials
 
