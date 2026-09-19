@@ -21,7 +21,8 @@
       "launchUrl": "{Scheme}://{ServiceHost}:{ServicePort}",
       "environmentVariables": {
         "ASPNETCORE_HTTPS_PORTS": "8081",
-        "ASPNETCORE_HTTP_PORTS": "8080"
+        "ASPNETCORE_HTTP_PORTS": "8080",
+        "ConnectionStrings__AppDbContext": "Host=host.docker.internal;Port=5432;Database=entitydetails;Username=postgres"
       },
       "publishAllPorts": true,
       "useSSL": true

@@ -33,6 +33,18 @@ updates:
       - dependency-name: "*"
         update-types: ["version-update:semver-major"]
 
+  - package-ecosystem: docker-compose
+    # The PostgreSQL image in docker-compose.yml, pinned by digest like the base images.
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      compose-images:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
   - package-ecosystem: github-actions
     # Actions in .github/workflows are pinned to commit SHAs; this bumps the SHA and its version comment.
     directory: /

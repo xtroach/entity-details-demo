@@ -1,6 +1,7 @@
 # Runs the full stack in containers, built from the same Dockerfiles as the published images:
 #   docker compose up --build     -> client on http://localhost:8080, API on http://localhost:5080
-#   docker compose down -v        -> also deletes the API's SQLite database volume
+#   docker compose up -d db       -> only the database, for running the API directly (see README.md)
+#   docker compose down -v        -> also deletes the PostgreSQL data volume
 # For day-to-day editing (hot reload, debugging) run the projects directly instead; see README.md.
 #
 # The Blazor client runs in the browser, not in its container, so API_BASE_URL must be an address
@@ -8,6 +9,27 @@
 # Changing the host ports means updating API_BASE_URL and BlazorClientOrigins__0 to match.
 
 services:
+  db:
+    # Pinned by digest like the Dockerfiles' base images; Dependabot (.github/dependabot.yml) keeps it
+    # current. Api.Tests' PostgresFixture uses the same image; keep the two in sync.
+    image: postgres:18-alpine@sha256:6c538e7206ea40ff740ef27883529390a690b6ead6ba96b44c67a9f7c638e8fd
+    environment:
+      POSTGRES_DB: entitydetails
+      # Local development only: no password, so no connection string in the repository carries a
+      # credential. The port is published on 127.0.0.1 only, so the database isn't reachable from
+      # other machines. Deployed environments use a managed server with real credentials.
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # PostgreSQL 18 images keep their data in a versioned directory under /var/lib/postgresql.
+      - db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "--username=postgres", "--dbname=entitydetails"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
   api:
     image: entitydetails-api
     build:
@@ -20,9 +42,12 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       # Replaces the first CORS origin from appsettings.json with the client container's origin.
       BlazorClientOrigins__0: http://localhost:8080
-    volumes:
-      # The image's connection string points at /data/entitydetails.db.
-      - api-data:/data
+      # Overrides appsettings.Development.json's localhost address with the Compose service name.
+      ConnectionStrings__AppDbContext: Host=db;Port=5432;Database=entitydetails;Username=postgres
+    depends_on:
+      # The API applies migrations at startup, so it waits until the database accepts connections.
+      db:
+        condition: service_healthy
 
   client:
     image: entitydetails-blazorclient
@@ -37,4 +62,4 @@ services:
       - api
 
 volumes:
-  api-data:
+  db-data:
