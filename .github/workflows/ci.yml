@@ -52,6 +52,19 @@ jobs:
             exit 1
           fi
 
+      # The Azure infrastructure (infra/) must compile and pass the linter rules in
+      # infra/bicepconfig.json. No Azure login is involved. The Bicep CLI version is pinned like
+      # every other build input; placeholder images satisfy staging.bicepparam, which otherwise
+      # requires the deploy workflow's API_IMAGE/CLIENT_IMAGE.
+      - name: Validate Bicep
+        env:
+          API_IMAGE: example.invalid/api@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          CLIENT_IMAGE: example.invalid/client@sha256:0000000000000000000000000000000000000000000000000000000000000000
+        run: |
+          az bicep install --version v0.47.16
+          az bicep build --file infra/main.bicep --stdout > /dev/null
+          az bicep build-params --file infra/staging.bicepparam --stdout > /dev/null
+
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
