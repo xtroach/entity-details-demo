@@ -222,8 +222,15 @@ steps with its own names:
 2. **GitHub's deploy identity:** the user-assigned managed identity
    `id-entitydetails-github-staging` in that resource group. It has a
    federated credential trusting only
-   `repo:xtroach/entity-details-demo:environment:staging` (GitHub OIDC; no
-   stored secret) and **Contributor on that resource group only**.
+   `repo:xtroach@41797801/entity-details-demo@1375147128:environment:staging`
+   (GitHub OIDC; no stored secret) and **Contributor on that resource group
+   only**. The subject has to match exactly what GitHub puts in its token.
+   This repository uses GitHub's *immutable* subject format, which includes
+   the owner's and the repository's numeric IDs. A renamed or re-created
+   repository with the same name therefore can't sign in as this identity.
+   Check the format before creating a credential for another environment:
+   `gh api repos/xtroach/entity-details-demo/actions/oidc/customization/sub`
+   (`sub_claim_prefix` is the part before `:environment:<name>`).
    Deployments must stay in incremental mode, because a complete-mode
    deployment would delete this identity, which isn't in the template.
 3. **GitHub Environment `staging`:** deployments from `main` only, no
