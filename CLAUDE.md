@@ -3,9 +3,10 @@
 ## README.md
 
 Keep README.md current with every change that affects setup, configuration, 
-architecture, or functionality — update it as part of the same change, not 
-as a follow-up. Trivial changes (typo fixes, formatting, internal refactors 
-with no external effect) don't require an update.
+architecture, functionality, or how changes are made and reviewed — 
+update it as part of the same change, not as a follow-up. Trivial changes 
+(typo fixes, formatting, internal refactors with no external effect) 
+don't require an update.
 
 Required sections:
 - **Overview** — what the system does and who/what it's for
@@ -18,6 +19,12 @@ Required sections:
   affect behavior, with defaults noted
 - **Architecture** — high-level structure: main components/projects, how 
   they interact, key design decisions
+- **Development Process** — how changes get made and reviewed: the
+  Scope/Implement/Trivial workflow, PR-only-to-main and the GitHub
+  settings enforcing it (branch protection, merge method, auto-delete),
+  and the reasoning behind them — written for a reader evaluating how
+  this project is built, not as agent instructions (that's what this
+  file is for)
 
 If a change doesn't fit an existing section, extend it rather than adding 
 new top-level sections without cause. Keep entries current rather than 
