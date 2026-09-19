@@ -1,0 +1,52 @@
+# Weekly version-update PRs, in addition to the security-update PRs enabled in repository settings.
+# Related packages are grouped so one PR updates them together (the Microsoft 10.0.x packages must
+# stay in lockstep). Major versions are ignored for NuGet, Docker and the SDK: moving to the next
+# .NET major version is a deliberate upgrade, not a routine bump.
+version: 2
+updates:
+  - package-ecosystem: nuget
+    # Versions live in Directory.Packages.props (central package management).
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      microsoft:
+        patterns: ["Microsoft.*", "System.*"]
+        exclude-patterns: ["Microsoft.NET.Test.Sdk"]
+      test:
+        patterns: ["xunit*", "bunit", "coverlet*", "Microsoft.NET.Test.Sdk"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: docker
+    # Base images are pinned by digest; this keeps the digests (and patch tags) current.
+    directories:
+      - /Api/src/EntityDetails.Api
+      - /BlazorClient/src/EntityDetails.BlazorClient
+    schedule:
+      interval: weekly
+    groups:
+      base-images:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  - package-ecosystem: github-actions
+    # Actions in .github/workflows are pinned to commit SHAs; this bumps the SHA and its version comment.
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: dotnet-sdk
+    # The SDK version in global.json.
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

@@ -23,8 +23,15 @@ entity-details-demo/
 ├── .dockerignore          # Build-context exclusions for every Dockerfile (all build from the root)
 ├── .editorconfig          # Repo-wide formatting and analyzer (StyleCop) rules
 ├── .gitattributes         # Line-ending policy: LF on every OS (CRLF only for .cmd/.bat)
+├── .github/
+│   ├── workflows/ci.yml   # CI: build, format, test, Docker build and smoke test on every PR
+│   ├── scripts/           # Helpers CI runs (Compose smoke test, test-result summary); also runnable locally
+│   ├── dependabot.yml     # Weekly version updates: NuGet, base images, actions, SDK
+│   └── ISSUE_TEMPLATE/, pull_request_template.md
 ├── CLAUDE.md              # Documentation and coding-standard requirements
 ├── Directory.Build.props  # MSBuild properties shared by every project (warnings as errors)
+├── Directory.Packages.props  # Every NuGet package version, set once (central package management)
+├── global.json            # Pins the .NET SDK version (10.0.401, later 10.0.x feature bands allowed)
 ├── README.md              # This file
 ├── docker-compose.yml     # Runs the API and Blazor client images together (full stack)
 ├── EntityDetailsDemo.slnx # Solution file referencing all 9 projects
@@ -67,7 +74,9 @@ entity-details-demo/
 
 ## Setup
 Prerequisites:
-- [.NET 10 SDK](https://dotnet.microsoft.com/download)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download), version 10.0.401 or a
+  later 10.0 SDK (`global.json` pins it; `dotnet --version` from the repo root
+  shows which one is used)
 - A trusted HTTPS development certificate (`dotnet dev-certs https --trust`)
 - Docker Desktop (optional, only needed for the full-stack Compose setup, to
   build the container images, or to run the API's `Container (Dockerfile)`
@@ -133,7 +142,16 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
 ## CodeConventions
 - Formatting and language conventions (indentation, brace style, `var` usage,
   file-scoped namespaces, etc.) are defined in `.editorconfig` and apply
-  repo-wide.
+  repo-wide. CI fails a PR whose formatting doesn't match: it runs
+  `dotnet format whitespace` and `dotnet format style --severity warn` with
+  `--verify-no-changes`. Run the same commands without that flag to fix
+  formatting locally.
+- NuGet versions are managed centrally. Each package's version is set once
+  in `Directory.Packages.props`, and projects reference packages without a
+  version, so every project always uses the same version of a package. To
+  add a package, add a `<PackageVersion>` there and a version-less
+  `<PackageReference>` in the project. To upgrade, change only
+  `Directory.Packages.props`.
 - Line endings are LF everywhere, including in Windows working copies.
   `.gitattributes` (`* text=auto eol=lf`) sets this for every clone,
   overriding each machine's `core.autocrlf`, and `.editorconfig`
@@ -271,6 +289,39 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
   The API creates its schema with `EnsureCreated`, which does nothing once
   the database exists. Entity changes therefore don't reach a persisted
   database; `docker compose down -v` resets it.
+- **CI** (`.github/workflows/ci.yml`) runs on every pull request to `main`,
+  every push to `main`, and on demand. It has two jobs, which are also the
+  required status checks on `main`:
+  - **Build and test** (Ubuntu). It checks that every committed file is LF
+    and has no BOM, then verifies formatting, builds in Release (warnings
+    are errors), and runs every test in the solution. Any failing test fails
+    the job. The test results (TRX) and coverage are uploaded as an artifact
+    and summarized on the run page even when tests fail. Coverage is only
+    reported for now; a gate is #23's decision.
+  - **Docker build and smoke test** runs only after the first job passes.
+    It builds both images with Compose, starts the stack, and runs
+    `.github/scripts/compose-smoke-test.sh`. The script checks that the API
+    returns seeded data, and that the client serves its page, falls back to
+    it for client-side routes, and applied `API_BASE_URL`. Run the script
+    locally after `docker compose up -d` to get the same checks.
+
+  CI runs on Linux only: that catches case-sensitivity bugs Windows hides,
+  and local verification covers Windows. The workflow has read-only
+  permissions, and its actions are pinned to commit SHAs, because a tag
+  can be moved to different code.
+- **Pinned versions.** Builds are reproducible because every input is
+  pinned:
+  - the SDK in `global.json`;
+  - NuGet packages in `Directory.Packages.props`;
+  - base images by digest in the Dockerfiles (the tag stays in front for
+    readability);
+  - actions by commit SHA.
+
+  Dependabot (`.github/dependabot.yml`) keeps them current with grouped
+  weekly PRs, which go through the same CI as any other change. It skips
+  major versions of .NET, packages and images, because those are
+  deliberate upgrades. NuGet lock files aren't used, because they have
+  known friction with Blazor WebAssembly's runtime packs.
 
 ## Development Process
 Changes to this repo go through a structured process, not ad-hoc prompting:
@@ -291,18 +342,24 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   repository level, the only GitHub method that never rewrites
   already-pushed commits. Merged branches auto-delete, which also keeps
   GitHub's PR-stacking mechanics reliable.
-- **Nothing merges without local verification.** Every PR touching code
-  has had `dotnet build`/`dotnet test` run locally first, with new or
-  changed logic accompanied by tests in the same PR.
+- **Nothing merges without green CI.** CI's two jobs ("Build and test",
+  "Docker build and smoke test") are required status checks on `main`,
+  with branches required to be up to date. A PR can't merge while its
+  build, formatting check, tests, or Docker smoke test fail, or before
+  they've finished. The assistant also runs `dotnet build`/`dotnet test`
+  locally before opening a PR, and states the result in the PR's test
+  plan.
 - **Supply-chain and secrets hygiene is on by default.** Dependabot
-  security updates, secret scanning, and push protection are enabled;
-  a committed secret is treated as compromised on sight, not just
-  deleted.
+  security updates and weekly version updates, CodeQL code scanning
+  (GitHub's default setup), secret scanning, and push protection are
+  enabled. Every build input is pinned (see Architecture). A committed
+  secret is treated as compromised on sight, not just deleted.
 - **Enforced where possible, self-enforced where not.** Where GitHub can
-  enforce a rule structurally (branch protection, merge method,
-  auto-delete), it does; where it can't yet (build/test verification,
-  test-writing discipline), the assistant follows it consistently and
-  flags genuinely ambiguous cases rather than deciding silently.
+  enforce a rule structurally, it does: branch protection, required CI
+  checks, merge method, auto-delete. The rest is self-enforced: tests
+  accompanying code changes, and the Scope/Implement/Trivial choice. There,
+  the assistant follows the rule consistently and flags genuinely
+  ambiguous cases rather than deciding silently.
 
 The complete, current rule set the assistant follows in this repo lives
 in [`CLAUDE.md`](./CLAUDE.md).
