@@ -55,7 +55,8 @@ entity-details-demo/
 │           └── WeatherForecastRequest.cs
 ├── Api/                           # ASP.NET Core Web API
 │   ├── src/EntityDetails.Api/
-│   │   ├── Program.cs             # Entry point, DI, and middleware pipeline
+│   │   ├── Program.cs             # Entry point, DI, middleware pipeline and health endpoints
+│   │   ├── HealthProbe.cs         # --probe mode used by the container HEALTHCHECK
 │   │   ├── Controllers/           # CRUD API controllers
 │   │   ├── Mapping/               # Entity <-> Contracts type mapping
 │   │   ├── Properties/launchSettings.json
@@ -168,7 +169,8 @@ docker compose down -v      # stop and delete the database (recreated and reseed
 The API runs in Development here, so it seeds sample data and serves
 OpenAPI at `http://localhost:5080/openapi/v1.json`. Code changes need
 `docker compose up --build` again, so use the direct setup above for
-editing.
+editing. `docker compose ps` shows each container's health (`healthy`,
+`unhealthy` or `starting`). All three images define a healthcheck.
 
 The images can also be built on their own (both build from the repo root):
 ```bash
@@ -251,6 +253,12 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
 - **ASPNETCORE_ENVIRONMENT** — controls the OpenAPI endpoint (Development
   only) and whether the API seeds sample weather forecasts on startup
   (Development only; see `Program.SeedDevelopmentData`).
+- **Health endpoints** (API, every environment; no configuration):
+  `GET /health/live` returns `Healthy` whenever the process answers.
+  `GET /health/ready` also checks that the database is reachable, and returns
+  503 `Unhealthy` when it isn't. `dotnet EntityDetails.Api.dll --probe`
+  requests `/health/live` on the first port in `ASPNETCORE_HTTP_PORTS`
+  (default 8080) and exits 0 or 1. The container's `HEALTHCHECK` uses it.
 - **Api/Properties/launchSettings.json** — local run profiles: `http` (port
   5148), `https` (ports 7178/5148), and `Container (Dockerfile)` (ports
   8080/8081; reaches the Compose database through `host.docker.internal`).
@@ -420,6 +428,22 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
   starting, because it applies migrations at startup and would otherwise race
   the database starting up. Entity changes reach the persisted `db-data`
   database through migrations, so there's no need to reset it.
+- **Health checks** follow ASP.NET Core's liveness/readiness split.
+  Liveness (`/health/live`) runs no checks, so a slow or unavailable
+  database never gets a healthy process restarted. Readiness
+  (`/health/ready`) runs EF Core's `DbContext` check (`CanConnectAsync`), so
+  an orchestrator only sends traffic to an instance that can reach the
+  database. Container Apps' probes in the staging deployment use these
+  endpoints. Each image carries its own `HEALTHCHECK`, so every run of it
+  reports health, not only Compose:
+  - The API's runtime image has neither `curl` nor `wget`, so the API probes
+    itself (`--probe`, see `HealthProbe.cs`). That keeps extra tools, and
+    their attack surface, out of the image and still works on chiseled or
+    distroless images later.
+  - The client image uses busybox `wget`, which ships with `nginx:alpine`.
+  - The client's Compose `depends_on: [api]` deliberately has no
+    `condition: service_healthy`. The WebAssembly app calls the API from the
+    browser, so the client container doesn't need a healthy API to start.
 - **CI** (`.github/workflows/ci.yml`) runs on every pull request to `main`,
   every push to `main`, and on demand. It has two jobs, which are also the
   required status checks on `main`:
@@ -433,10 +457,11 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
   - **Docker build and smoke test** runs only after the first job passes.
     It builds both images with Compose, starts the stack (including
     PostgreSQL), and runs `.github/scripts/compose-smoke-test.sh`. The
-    script checks that the API returns seeded data (which proves the
-    database, migrations and seeding end to end), and that the client
-    serves its page, falls back to it for client-side routes, and applied `API_BASE_URL`. Run the script
-    locally after `docker compose up -d` to get the same checks.
+    script checks that the API reports ready and returns seeded data
+    (which proves the database, migrations and seeding end to end), and
+    that the client serves its page, falls back to it for client-side
+    routes, and applied `API_BASE_URL`. Run the script locally after
+    `docker compose up -d` to get the same checks.
 
   CI runs on Linux only: that catches case-sensitivity bugs Windows hides,
   and local verification covers Windows. The workflow has read-only
