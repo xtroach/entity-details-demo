@@ -1,0 +1,61 @@
+# Daily full audit of the rule set: CLAUDE.md and README.md against each other, against themselves,
+# and against the configuration they describe. The rubric lives in
+# .claude/skills/doc-coherence/SKILL.md, shared with the per-pull-request workflow.
+#
+# Findings are reported through a single rolling issue labelled `doc-coherence`, whose body each run
+# rewrites, rather than a daily comment. Drift that persists for weeks then produces one issue, not
+# thirty notifications. The audit never closes that issue — that is the owner's call.
+name: Docs coherence audit
+
+on:
+  schedule:
+    # 05:00 UTC daily. GitHub runs scheduled workflows only from the default branch, and attributes
+    # the run to whoever last changed this cron line; the action rejects bot actors, so if that ever
+    # becomes a bot the run needs an `allowed_bots` entry.
+    - cron: "0 5 * * *"
+  workflow_dispatch:
+
+# Least privilege: read the repository, and write only the rolling findings issue.
+permissions:
+  contents: read
+  issues: write
+
+# One audit at a time. A manual run while the scheduled one is working waits rather than racing it
+# for the rolling issue.
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Docs coherence audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      # Third-party actions are pinned to full commit SHAs (tags can be moved); Dependabot updates them.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1
+        env:
+          # gh reads GH_TOKEN; the allowlist below limits it to the issue operations the rubric needs.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # A subscription token from `claude setup-token`, so runs don't incur separate API billing.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Explicit, so the action does not fall back to authenticating as the Claude GitHub App,
+          # whose permission set is far wider than filing one issue needs.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          prompt: |
+            /doc-coherence
+            Mode: daily-audit.
+            Audit the whole rule set, not a diff.
+            Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            Report through the rolling issue labelled `doc-coherence`, exactly as the rubric's
+            daily-audit table describes. Never close that issue.
+          claude_args: |
+            --model claude-opus-5
+            --max-turns 40
+            --allowedTools "Read,Grep,Glob,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*)"

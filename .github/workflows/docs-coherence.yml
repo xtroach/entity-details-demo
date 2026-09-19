@@ -1,0 +1,72 @@
+# Audits the rule documents against each other when a pull request changes one of them, or changes
+# configuration those documents describe. The rubric lives in .claude/skills/doc-coherence/SKILL.md,
+# shared with the daily audit workflow.
+#
+# Deliberately NOT a required status check on main, for two independent reasons:
+#   - It is path-filtered, so on a pull request touching none of these files it never reports at
+#     all, and a required check that never reports blocks merging forever.
+#   - It is a model, not a deterministic script. A false positive must never be able to wedge a
+#     merge. It comments; the owner decides.
+name: Docs coherence
+
+on:
+  pull_request:
+    branches: [main]
+    # The files where a contradiction between CLAUDE.md, README.md and the configuration they
+    # describe can actually be introduced. A change under Data/src/ cannot create one.
+    paths:
+      - CLAUDE.md
+      - README.md
+      - .editorconfig
+      - Directory.Build.props
+      - .gitattributes
+      - .github/workflows/**
+      - .github/pull_request_template.md
+      - .github/ISSUE_TEMPLATE/**
+
+# Least privilege: read the repository, and write only the findings comment.
+permissions:
+  contents: read
+  pull-requests: write
+
+# A new push to a pull request cancels that pull request's audit in progress.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  coherence:
+    name: Docs coherence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # Third-party actions are pinned to full commit SHAs (tags can be moved); Dependabot updates them.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The rubric diffs the pull request against its merge base, so the history has to be there.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1
+        env:
+          # gh reads GH_TOKEN; the allowlist below limits it to commenting on this pull request.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # A subscription token from `claude setup-token`, so runs don't incur separate API billing.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Explicit, so the action does not fall back to authenticating as the Claude GitHub App,
+          # whose permission set is far wider than posting one comment needs.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Supplying a prompt puts the action in automation mode: it runs on the event itself,
+          # with no @claude mention. The rubric is the checked-out skill.
+          prompt: |
+            /doc-coherence
+            Mode: pull-request.
+            Base commit: ${{ github.event.pull_request.base.sha }}
+            Pull request: #${{ github.event.pull_request.number }}
+            Post findings as one comment on that pull request. If there are no findings, post
+            nothing at all.
+          claude_args: |
+            --model claude-opus-5
+            --max-turns 20
+            --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*)"

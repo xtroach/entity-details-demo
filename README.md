@@ -21,12 +21,16 @@ per entity (e.g. `WeatherForecast/`), so a given entity's files live
 together as the number of entities grows.
 ```
 entity-details-demo/
+├── .claude/skills/doc-coherence/SKILL.md  # Rubric both docs-coherence workflows run (see Development Process)
 ├── .config/dotnet-tools.json  # Local .NET tools (dotnet-ef, pinned to the EF Core version)
 ├── .dockerignore          # Build-context exclusions for every Dockerfile (all build from the root)
 ├── .editorconfig          # Repo-wide formatting and analyzer (StyleCop) rules
 ├── .gitattributes         # Line-ending policy: LF on every OS (CRLF only for .cmd/.bat)
 ├── .github/
-│   ├── workflows/ci.yml   # CI on every PR; on main also publishes the images and deploys to staging
+│   ├── workflows/
+│   │   ├── ci.yml                    # CI on every PR; on main also publishes the images and deploys to staging
+│   │   ├── docs-coherence.yml        # Docs-coherence check, on PRs changing a rule or a file it describes
+│   │   └── docs-coherence-audit.yml  # Daily full docs-coherence audit
 │   ├── scripts/           # Helpers CI runs (smoke test, staging deploy, test-result summary); also runnable locally
 │   ├── dependabot.yml     # Weekly version updates: NuGet, base and Compose images, actions, SDK
 │   └── ISSUE_TEMPLATE/, pull_request_template.md
@@ -383,6 +387,18 @@ debugging with `psql`.
   deploy time.
 - **User secrets** — `Api`'s project has a `UserSecretsId` configured for
   storing local secrets outside source control via `dotnet user-secrets`.
+- **CLAUDE_CODE_OAUTH_TOKEN** (GitHub Actions repository secret) — what the two
+  docs-coherence workflows authenticate with. It's a Claude subscription token,
+  created locally with `claude setup-token` and set with
+  `gh secret set CLAUDE_CODE_OAUTH_TOKEN`, so those runs don't incur separate
+  API billing. Until it's set both workflows fail; nothing else is affected,
+  since neither is a required status check. They need no other credential and no
+  GitHub App: they pass the built-in `GITHUB_TOKEN` for GitHub operations, so
+  findings are posted by `github-actions[bot]`.
+- **`doc-coherence` label** (`gh label create doc-coherence`) — the daily audit
+  reports through the single open issue carrying this label, rewriting its body
+  on each run so it always shows current state. Without the label the audit
+  files a new issue every day it finds something instead of updating one.
 
 ## Architecture
 - **Data** (`EntityDetails.Data`) is a class library owning `AppDbContext`,
@@ -698,6 +714,17 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   they've finished. The assistant also runs `dotnet build`/`dotnet test`
   locally before opening a PR, and states the result in the PR's test
   plan.
+- **The rules are audited, not only written down.** The requirement to keep
+  `README.md` current is otherwise enforced only by the discipline of the same
+  session that just changed the rule. Two workflows check `CLAUDE.md`,
+  `README.md` and the configuration they describe against each other: one on any
+  PR that touches a rule document or a file it describes, and a full audit daily
+  that reports through a single rolling issue rather than a daily comment.
+  Neither can approve anything — they comment and file, because resolving a
+  contradiction is a judgment call about which document is wrong. Neither is a
+  required status check either: both are path-filtered or scheduled, so they
+  don't report on every PR, and a required check that never reports would block
+  merging forever.
 - **Every merge deploys to staging, without stored credentials.** After CI
   passes on `main`, the images it tested are published and deployed to the
   Azure staging environment by digest, migrated before rollout and
