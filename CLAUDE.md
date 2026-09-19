@@ -177,10 +177,10 @@ one.
 - Local secrets go through `dotnet user-secrets` (`Api` already has a
   `UserSecretsId` configured) or environment variables — never into a
   committed file.
-- A local-only value that isn't actually sensitive (e.g. the current
-  SQLite `Data Source=entitydetails.db` connection string, which has no
-  embedded credentials) is fine to commit as-is — this rule is about
-  actual secrets, not every config value near "ConnectionStrings."
+- A local-only value that isn't actually sensitive — no embedded
+  credentials, e.g. a local file path or a non-secret default — is fine
+  to commit as-is. This rule is about actual secrets, not every config
+  value near "ConnectionStrings."
 - If a real secret is ever found already committed, flag it immediately
   rather than just removing it going forward — a committed secret is
   compromised the moment it's pushed; removing the line doesn't undo
