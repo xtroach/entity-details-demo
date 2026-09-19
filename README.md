@@ -41,6 +41,8 @@ entity-details-demo/
 ├── Data/                          # EF Core data-access layer
 │   ├── src/EntityDetails.Data/
 │   │   ├── AppDbContext.cs        # The application's DbContext
+│   │   ├── AppDbContextOptions.cs # The one place the provider (Npgsql) is configured
+│   │   ├── ServiceCollectionExtensions.cs / ServiceProviderExtensions.cs  # AddEntityDetailsData, MigrateEntityDetailsDatabaseAsync
 │   │   ├── AppDbContextDesignTimeFactory.cs  # Lets dotnet ef use Data as its own startup project
 │   │   ├── Entities/               # EF entities, one folder per entity
 │   │   │   └── WeatherForecast/WeatherForecast.cs
@@ -236,9 +238,10 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
   missing, so a misconfigured deployment can't start and fail only on its
   first request. `appsettings.Development.json` sets it to the local Compose
   database (`Host=localhost;Port=5432;Database=entitydetails;Username=postgres`).
-  Every other environment has to supply it. The API always turns off
-  Npgsql's GSS (Kerberos) encryption, because the runtime image has no
-  Kerberos library, and turns on retries for transient connection errors.
+  Every other environment has to supply it. The API passes it to `Data`
+  unchanged. `Data` always turns off Npgsql's GSS (Kerberos) encryption,
+  because the runtime image has no Kerberos library, and turns on retries
+  for transient connection errors (see Architecture).
 - **Local database credentials** — the Compose `db` service uses
   `POSTGRES_HOST_AUTH_METHOD=trust` and publishes port 5432 on `127.0.0.1`
   only. That's why no connection string in the repository contains a
@@ -280,9 +283,24 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
 - **Data** (`EntityDetails.Data`) is a class library owning `AppDbContext`,
   the EF entities (e.g. `WeatherForecast`) and the PostgreSQL migrations.
   It has no knowledge of HTTP or the API and is referenced only by `Api`.
-  `AppDbContextDesignTimeFactory` makes it its own startup project for
-  `dotnet ef`, so the migration tooling doesn't depend on the API's startup
-  or configuration.
+  It also owns the database setup, following the same pattern as
+  `ApiClient`'s `AddEntityDetailsApiClient(Uri)`: the host passes a plain
+  value, and the library does the rest.
+  - `services.AddEntityDetailsData(connectionString)` registers
+    `AppDbContext` for PostgreSQL. It turns on retries for the transient
+    errors a managed database produces on failover, and turns off GSS
+    encryption.
+  - `serviceProvider.MigrateEntityDetailsDatabaseAsync()` applies pending
+    migrations. `Data` provides *how* to migrate, and the host decides
+    *when*: at startup today, in a deploy step once there's continuous
+    deployment.
+  - Both of these and `AppDbContextDesignTimeFactory` go through one
+    internal `AppDbContextOptions.Configure`. The provider is decided in one
+    place, next to the migrations that depend on it. A future engine change
+    doesn't touch `Api`'s code, only configuration values.
+  - `AppDbContextDesignTimeFactory` makes `Data` its own startup project for
+    `dotnet ef`, so the migration tooling doesn't depend on the API's startup
+    or configuration.
 - **Why a managed PostgreSQL database.** The API keeps no data on its own
   disk. That means the API container can run on any container host, can run
   several instances or scale to zero, and can be replaced on every deploy.
@@ -303,13 +321,17 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
   project: it holds plain data shapes with no behavior to test today (see
   the open validation-layer issue for planned changes to this).
 - **Api** (`EntityDetails.Api`) is an ASP.NET Core Web API referencing
-  `Data` and `Contracts`. `Program.cs` registers the DbContext (Npgsql), a
-  CORS policy for the Blazor client's origin, applies pending migrations on
-  startup (`Database.Migrate()`), and seeds sample data in Development only.
-  Migrating at startup is safe while one instance runs (Compose, local
-  development). A multi-instance deployment should apply migrations in a
-  deploy step before rollout instead.
-  `Controllers/WeatherForecastController` exposes full CRUD (`GET`, `GET/{id}`, `POST`, `PUT/{id}`, `DELETE/{id}`) in terms of
+  `Data` and `Contracts`. `Program.cs` reads the required connection
+  string and passes it to `AddEntityDetailsData`, so it never names a
+  database provider. This holds by convention: Npgsql still reaches `Api`
+  transitively, because `Data` needs it at runtime. `Program.cs` also
+  registers a CORS policy for the Blazor client's origin, applies pending
+  migrations on startup (`MigrateEntityDetailsDatabaseAsync`), and seeds
+  sample data in Development only. Migrating at startup is safe while one
+  instance runs (Compose, local development). A multi-instance deployment
+  should apply migrations in a deploy step before rollout instead.
+  `Controllers/WeatherForecastController` exposes full CRUD (`GET`,
+  `GET/{id}`, `POST`, `PUT/{id}`, `DELETE/{id}`) in terms of
   `Contracts` types, not the EF entity directly; `Mapping/WeatherForecastMapper`
   converts between the `WeatherForecast` entity and its `Contracts`
   representation.
@@ -331,10 +353,12 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
   (same image as Compose). Each factory gets its own new database in it, and
   the API's startup migrates it, so the tests run the real provider and
   migrations rather than InMemory, which hides relational behavior.
-  `Data.Tests` tests `AppDbContext` directly against InMemory, and
-  `MigrationsTests` fails whenever the model has changes that no migration
-  covers. That check compares the model with the snapshot and needs no
-  database. `ApiClient.Tests` fakes `HttpMessageHandler` to
+  `Data.Tests` needs no database for any of its tests. It tests
+  `AppDbContext` directly against InMemory, and checks that
+  `AddEntityDetailsData` registers the Npgsql provider with GSS off and
+  retries on, and rejects an empty connection string. `MigrationsTests` fails
+  whenever the model has changes that no migration covers, by comparing the
+  model with the snapshot. `ApiClient.Tests` fakes `HttpMessageHandler` to
   test the typed client in isolation; `BlazorClient.Tests` uses bUnit to
   render `Weather.razor` against a fake `IWeatherForecastApiClient`.
 - Both Dockerfiles build from the repository root, because each app needs
