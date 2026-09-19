@@ -165,9 +165,9 @@ one.
   version, rather than doing it silently mid-task. Note anything relevant
   (license, major version jump, why it's needed).
 - This applies to direct `PackageReference` additions/upgrades only (in
-  any project, src or test) — not to transitive packages that come along
-  with one. A transitive package isn't an independent decision; it's a
-  consequence of whatever direct package pulled it in.
+  any project's `*/src/` or `*/test/`) — not to transitive packages that
+  come along with one. A transitive package isn't an independent
+  decision; it's a consequence of whatever direct package pulled it in.
 
 ## Secrets and credentials
 
