@@ -14,6 +14,7 @@ ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["Api/src/EntityDetails.Api/EntityDetails.Api.csproj", "Api/src/EntityDetails.Api/"]
 COPY ["Data/src/EntityDetails.Data/EntityDetails.Data.csproj", "Data/src/EntityDetails.Data/"]
+COPY ["Contracts/src/EntityDetails.Contracts/EntityDetails.Contracts.csproj", "Contracts/src/EntityDetails.Contracts/"]
 RUN dotnet restore "./Api/src/EntityDetails.Api/EntityDetails.Api.csproj"
 COPY . .
 WORKDIR "/src/Api/src/EntityDetails.Api"
