@@ -142,9 +142,11 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
   file as modified with an empty diff, and `docker build` from Windows gets
   the same LF files the Linux containers need. The one exception is
   `.cmd`/`.bat`, which are CRLF because Windows needs that to run them.
-- Files are UTF-8 with a BOM (as Visual Studio writes them), except shell
-  scripts: those are UTF-8 without a BOM and LF-only, because a BOM or CRLF
-  before `#!` breaks the shebang inside the container.
+- Every file is UTF-8 without a BOM (`charset = utf-8` in `.editorconfig`).
+  Some Linux tools in the containers fail on a BOM: nginx rejects a
+  `nginx.conf` that starts with one (`unknown directive`), and a BOM before
+  `#!` breaks a shell script's shebang. The .NET toolchain doesn't need a BOM
+  either, since Roslyn and MSBuild default to UTF-8.
 - `Nullable` and `ImplicitUsings` are enabled in every project.
 - Every project builds with `TreatWarningsAsErrors` (set once in
   `Directory.Build.props`), so any compiler, analyzer, or NuGet warning —
