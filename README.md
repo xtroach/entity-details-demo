@@ -20,11 +20,15 @@ per entity (e.g. `WeatherForecast/`), so a given entity's files live
 together as the number of entities grows.
 ```
 entity-details-demo/
+├── .dockerignore          # Build-context exclusions for every Dockerfile (all build from the root)
 ├── .editorconfig          # Repo-wide formatting and analyzer (StyleCop) rules
+├── .gitattributes         # Forces LF endings for shell scripts that run inside containers
 ├── CLAUDE.md              # Documentation and coding-standard requirements
 ├── Directory.Build.props  # MSBuild properties shared by every project (warnings as errors)
 ├── README.md              # This file
+├── docker-compose.yml     # Runs the API and Blazor client images together (full stack)
 ├── EntityDetailsDemo.slnx # Solution file referencing all 9 projects
+├── EntityDetailsDemo.slnLaunch  # Shared VS multi-startup profile: API + Blazor client
 ├── Data/                          # EF Core data-access layer
 │   ├── src/EntityDetails.Data/
 │   │   ├── AppDbContext.cs        # The application's DbContext
@@ -54,36 +58,67 @@ entity-details-demo/
     ├── src/EntityDetails.BlazorClient/
     │   ├── Program.cs             # Registers ApiClient, configures API base URL
     │   ├── Pages/, Layout/, wwwroot/
-    │   └── wwwroot/appsettings.json    # ApiBaseUrl setting
+    │   ├── wwwroot/appsettings.json    # ApiBaseUrl setting
+    │   ├── Dockerfile             # Publishes the client and serves it with nginx
+    │   ├── nginx.conf             # SPA fallback, precompressed assets, cache headers
+    │   └── docker-entrypoint.d/40-api-base-url.sh  # Applies API_BASE_URL at container start
     └── test/EntityDetails.BlazorClient.Tests/   # bUnit component tests
 ```
 
 ## Setup
 Prerequisites:
 - [.NET 10 SDK](https://dotnet.microsoft.com/download)
-- Docker Desktop (optional, only needed to run the API's `Container (Dockerfile)` launch profile)
+- A trusted HTTPS development certificate (`dotnet dev-certs https --trust`)
+- Docker Desktop (optional, only needed for the full-stack Compose setup, to
+  build the container images, or to run the API's `Container (Dockerfile)`
+  launch profile)
 
-Get a dev environment running (two terminals — the API must be running for
-the Blazor client to fetch data):
-```bash
-git clone <repo-url>
-cd entity-details-demo
+There are two ways to run the app, for two different jobs.
 
-# Terminal 1 — API (creates/seeds a local SQLite database on first run)
-cd Api/src/EntityDetails.Api
-dotnet run
+**Day-to-day development** (hot reload, debugging) runs both projects
+directly on the host:
+- **Visual Studio:** pick the shared **API + Blazor client** startup profile
+  (from `EntityDetailsDemo.slnLaunch`) and press F5. It starts both projects
+  with their `https` launch profiles.
+- **CLI / other editors:** run `dotnet watch` in two terminals:
+  ```bash
+  git clone <repo-url>
+  cd entity-details-demo
 
-# Terminal 2 — Blazor client
-cd BlazorClient/src/EntityDetails.BlazorClient
-dotnet run
-```
-The API starts on `http://localhost:5148` / `https://localhost:7178`; the
+  # Terminal 1: API (creates/seeds a local SQLite database on first run)
+  cd Api/src/EntityDetails.Api
+  dotnet watch --launch-profile https
+
+  # Terminal 2: Blazor client
+  cd BlazorClient/src/EntityDetails.BlazorClient
+  dotnet watch --launch-profile https
+  ```
+
+The API starts on `https://localhost:7178` / `http://localhost:5148`; the
 OpenAPI document is available at `/openapi/v1.json` in Development. The
-Blazor client starts on `http://localhost:5286` / `https://localhost:7137`
+Blazor client starts on `https://localhost:7137` / `http://localhost:5286`
 and calls the API at the `ApiBaseUrl` configured in its
 `wwwroot/appsettings.json` (defaults to `https://localhost:7178`). Run the
 whole solution with `dotnet build` / `dotnet test` from the repo root using
 `EntityDetailsDemo.slnx`.
+
+**Full stack in containers** (running the app as it ships, without the .NET
+SDK) builds and runs both images with Docker Compose from the repo root:
+```bash
+docker compose up --build   # client: http://localhost:8080, API: http://localhost:5080
+docker compose down         # stop; the API's database is kept in the api-data volume
+docker compose down -v      # stop and delete the database (reseeded on next start)
+```
+The API runs in Development here, so it seeds sample data and serves
+OpenAPI at `http://localhost:5080/openapi/v1.json`. Code changes need
+`docker compose up --build` again, so use the direct setup above for
+editing.
+
+The images can also be built on their own (both build from the repo root):
+```bash
+docker build -f Api/src/EntityDetails.Api/Dockerfile -t entitydetails-api .
+docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entitydetails-blazorclient .
+```
 
 ## CodeConventions
 - Formatting and language conventions (indentation, brace style, `var` usage,
@@ -120,6 +155,25 @@ whole solution with `dotnet build` / `dotnet test` from the repo root using
   8080/8081).
 - **BlazorClient/wwwroot/appsettings.json** — `ApiBaseUrl`, the address the
   Blazor client's `ApiClient` registration points at.
+- **API_BASE_URL** (Blazor client container only) — when set, the
+  container's entrypoint hook rewrites the served `appsettings.json` so
+  `ApiBaseUrl` points at this address. If it isn't set, the image keeps the
+  published default (`https://localhost:7178`). The API must also allow the
+  client container's origin through CORS, e.g.
+  `BlazorClientOrigins__0=http://localhost:8080` on the API.
+- **API image defaults** — the API's Dockerfile sets
+  `ConnectionStrings__AppDbContext=Data Source=/data/entitydetails.db`, so
+  the database lives in `/data` in every container run of the image. Mount
+  a volume there to keep it.
+- **docker-compose.yml**. Host ports are `5080` (API) and `8080` (client).
+  The API gets `ASPNETCORE_ENVIRONMENT=Development`,
+  `BlazorClientOrigins__0=http://localhost:8080` and the `api-data` volume at
+  `/data`. The client gets `API_BASE_URL=http://localhost:5080`. To change a
+  host port, also update the `API_BASE_URL`/`BlazorClientOrigins__0` value
+  that refers to it.
+- **EntityDetailsDemo.slnLaunch**: the shared Visual Studio multi-startup
+  profile (API and client, both on `https`). Personal profiles still go in
+  the untracked `EntityDetailsDemo.slnLaunch.user`.
 - **User secrets** — `Api`'s project has a `UserSecretsId` configured for
   storing local secrets outside source control via `dotnet user-secrets`.
 
@@ -161,9 +215,39 @@ whole solution with `dotnet build` / `dotnet test` from the repo root using
   directly against InMemory; `ApiClient.Tests` fakes `HttpMessageHandler` to
   test the typed client in isolation; `BlazorClient.Tests` uses bUnit to
   render `Weather.razor` against a fake `IWeatherForecastApiClient`.
-- `Api`'s `Dockerfile` builds from the repository root (`DockerfileContext`
-  is set to the repo root) since it needs the `Api`, `Data`, and `Contracts`
-  project files to restore.
+- Both Dockerfiles build from the repository root, because each app needs
+  sibling projects' files to restore (`Api` needs `Data` and `Contracts`;
+  `BlazorClient` needs `ApiClient` and `Contracts`). `Api`'s
+  `DockerfileContext` is set to the repo root for Visual Studio. Docker
+  only reads `.dockerignore` from the root of the build context, so the
+  single `.dockerignore` lives at the repo root. It keeps host `bin/`/`obj/`,
+  IDE state, and local SQLite databases out of every image build.
+- The `BlazorClient` image is a two-stage build. The .NET SDK publishes the
+  app, and `nginx:alpine` serves the published `wwwroot`. A Blazor
+  WebAssembly app is plain static files once published, so the final image
+  needs no .NET runtime. `nginx.conf` falls back to `index.html` for
+  client-side routes and serves the `.gz` files publish already writes. The
+  browser downloads `appsettings.json` at startup, so the API address is set
+  when the container starts (`API_BASE_URL`), not baked in at build time.
+  One image can target any API.
+- There are deliberately two ways to run the app. `docker-compose.yml` runs
+  the stack as it ships, from the real images. Daily editing runs the projects
+  directly (shared VS profile or `dotnet watch`), because in containers every
+  change needs an image rebuild, there's no hot reload, and debugging
+  WebAssembly is awkward. Existing tooling covers both, so there is no custom
+  script to maintain.
+- In Compose, the client's `API_BASE_URL` is the API's host address
+  (`http://localhost:5080`), not the service name `http://api:8080`. The
+  WebAssembly app runs in the browser, which can't resolve Compose service
+  names, so every API call comes from the browser rather than the client
+  container.
+- The API image keeps its SQLite database in `/data`, not next to the app
+  in `/app`, so a volume can persist it without hiding the published files.
+  The Dockerfile creates `/data` owned by the non-root `app` user, because
+  an empty named volume takes the ownership of the path it's mounted on.
+  The API creates its schema with `EnsureCreated`, which does nothing once
+  the database exists. Entity changes therefore don't reach a persisted
+  database; `docker compose down -v` resets it.
 
 ## Development Process
 Changes to this repo go through a structured process, not ad-hoc prompting:
