@@ -335,6 +335,35 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
   `Contracts` types, not the EF entity directly; `Mapping/WeatherForecastMapper`
   converts between the `WeatherForecast` entity and its `Contracts`
   representation.
+- **Data access: EF Core directly, no repository layer.** `Api` works with
+  `AppDbContext` and EF Core's query API directly. This is a deliberate
+  decision, not a gap, for three reasons:
+  - EF Core already implements these patterns: `DbSet<T>` is a repository,
+    and `DbContext` is a unit of work with change tracking and a
+    transaction boundary at `SaveChanges`.
+  - A generic repository forces a bad choice. Returning `IEnumerable<T>`
+    loses projections, `Include`, `AsNoTracking`, paging in SQL, bulk
+    `ExecuteUpdate`/`ExecuteDelete` and composable queries, which leads to
+    over-fetching or a method per query shape. Returning `IQueryable<T>`
+    leaks EF anyway.
+  - The usual reasons for a repository don't apply here. Tests run against
+    real PostgreSQL rather than mocked queries (which LINQ-to-objects
+    accepts even when EF can't translate them). EF already abstracts the
+    provider. `Contracts` and `ApiClient` keep EF out of the front end.
+
+  The rule that keeps this clean: **`Api` may use EF Core, but not
+  provider-specific APIs.** `Where`, `Select`, `ToListAsync` and
+  `ExecuteDeleteAsync` are fine. Npgsql-only APIs such as
+  `EF.Functions.ILike` belong in `Data`, behind a provider-neutral helper,
+  so the provider stays decided in one place. Shared query and persistence
+  logic goes into `Data` as helpers that build on EF rather than hide it:
+  `IQueryable<T>` extension methods (paging, sorting, filtering),
+  `IEntityTypeConfiguration<T>` per entity, and `SaveChanges` interceptors
+  for cross-cutting behavior. Generic CRUD can work on
+  `dbContext.Set<TEntity>()` directly. A repository or domain service
+  specific to one entity is still an option where that entity gains rules
+  that every write must enforce. That's a case-by-case decision, not a
+  layer everywhere.
 - **ApiClient** (`EntityDetails.ApiClient`) is a class library referencing
   only `Contracts` — no dependency on `Data`. It defines
   `IWeatherForecastApiClient`/`WeatherForecastApiClient`, a typed
