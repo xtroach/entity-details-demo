@@ -1,0 +1,12 @@
+<Project>
+
+  <!--
+    Imported automatically by every project in the repository. Treating warnings as errors makes
+    the analyzer rules configured in .editorconfig (e.g. the StyleCop XML documentation rules and
+    CS1591) fail the build rather than only reporting it.
+  -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+</Project>
