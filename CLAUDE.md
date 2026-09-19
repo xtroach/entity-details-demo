@@ -49,6 +49,28 @@ member actually does or represents in context.
 
 Private members should be documented only when their logic is non-obvious.
 
+# Code Design
+
+## Data access
+
+- Don't add a generic repository or unit-of-work layer over EF Core.
+  `Api` uses `AppDbContext` and EF Core's query API directly. `DbSet<T>`
+  and `DbContext` already are those patterns, and wrapping them loses
+  projections, `Include`, `AsNoTracking`, SQL-side paging and composable
+  queries. README's Architecture section has the full reasoning.
+- `Api` may use EF Core, but never provider-specific APIs (e.g. Npgsql's
+  `EF.Functions.ILike`, anything under `Npgsql.*`). Those go into `Data`
+  behind a provider-neutral helper. The provider is configured only in
+  `Data` (`AppDbContextOptions`), and `Api` only passes a connection string
+  to `AddEntityDetailsData` and decides when to call
+  `MigrateEntityDetailsDatabaseAsync`.
+- Shared data-access logic goes into `Data` as helpers that build on EF
+  rather than hide it: `IQueryable<T>` extension methods, per-entity
+  `IEntityTypeConfiguration<T>`, and `SaveChanges` interceptors.
+- If an entity gains rules that every write must enforce, a repository or
+  domain service specific to that entity may be warranted. Raise it as a
+  design question rather than adding one silently.
+
 # Workflow
 
 ## Scope, implement, or trivial

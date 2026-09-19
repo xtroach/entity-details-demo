@@ -4,11 +4,8 @@
 # Base images are pinned by digest so every build uses exactly the same image. The tag stays for
 # readability; Dependabot (.github/dependabot.yml) opens a PR when a new digest is published.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:6a94333d37514e385650a3c81a55e5350b67253dbe136e9cf17e499c35606a8c AS base
-# The SQLite database lives in /data rather than next to the app in /app, so a volume mounted at
-# /data persists it without hiding the published files. The directory is created owned by the
-# non-root app user because an empty named volume takes the ownership of the path it's mounted on.
-RUN mkdir /data && chown $APP_UID:$APP_UID /data
-ENV ConnectionStrings__AppDbContext="Data Source=/data/entitydetails.db"
+# The image holds no data: the database is a separate PostgreSQL server, and its connection string
+# (ConnectionStrings__AppDbContext) must be supplied when the container starts.
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080

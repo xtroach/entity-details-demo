@@ -1,6 +1,5 @@
 using EntityDetails.Data;
 using EntityDetails.Data.Entities;
-using Microsoft.EntityFrameworkCore;
 
 namespace EntityDetails.Api;
 
@@ -15,7 +14,16 @@ public class Program
     /// Configures and starts the web application.
     /// </summary>
     /// <param name="args">The command-line arguments passed to the process.</param>
-    public static void Main(string[] args)
+    /// <returns>A task that completes when the application shuts down.</returns>
+    /// <exception cref="InvalidOperationException">
+    /// The <c>ConnectionStrings:AppDbContext</c> setting is missing.
+    /// </exception>
+    /// <remarks>
+    /// Applies pending EF Core migrations at startup, which is safe while a single instance runs
+    /// (Docker Compose, local development). A multi-instance deployment should apply them in a
+    /// deploy step before rollout instead.
+    /// </remarks>
+    public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
@@ -24,9 +32,12 @@ public class Program
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
 
-        builder.Services.AddDbContext<AppDbContext>(options =>
-            options.UseSqlite(builder.Configuration.GetConnectionString("AppDbContext")
-                ?? "Data Source=entitydetails.db"));
+        // No fallback: a deployment without a connection string fails here, at startup, rather than
+        // on its first request. The provider and its settings are the data layer's concern.
+        var connectionString = builder.Configuration.GetConnectionString("AppDbContext")
+            ?? throw new InvalidOperationException(
+                "The connection string 'ConnectionStrings:AppDbContext' is not configured.");
+        builder.Services.AddEntityDetailsData(connectionString);
 
         var blazorClientOrigins = builder.Configuration.GetSection("BlazorClientOrigins").Get<string[]>()
             ?? ["https://localhost:7137", "http://localhost:5286"];
@@ -40,14 +51,11 @@ public class Program
 
         var app = builder.Build();
 
-        using (var scope = app.Services.CreateScope())
+        await app.Services.MigrateEntityDetailsDatabaseAsync();
+        if (app.Environment.IsDevelopment())
         {
-            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            dbContext.Database.EnsureCreated();
-            if (app.Environment.IsDevelopment())
-            {
-                SeedDevelopmentData(dbContext);
-            }
+            using var scope = app.Services.CreateScope();
+            SeedDevelopmentData(scope.ServiceProvider.GetRequiredService<AppDbContext>());
         }
 
         // Configure the HTTP request pipeline.
@@ -64,7 +72,7 @@ public class Program
 
         app.MapControllers();
 
-        app.Run();
+        await app.RunAsync();
     }
 
     private static void SeedDevelopmentData(AppDbContext dbContext)
