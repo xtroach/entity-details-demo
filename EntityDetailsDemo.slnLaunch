@@ -1,0 +1,17 @@
+[
+  {
+    "Name": "API + Blazor client",
+    "Projects": [
+      {
+        "Path": "Api\src\EntityDetails.Api\EntityDetails.Api.csproj",
+        "Action": "Start",
+        "DebugTarget": "https"
+      },
+      {
+        "Path": "BlazorClient\src\EntityDetails.BlazorClient\EntityDetails.BlazorClient.csproj",
+        "Action": "Start",
+        "DebugTarget": "https"
+      }
+    ]
+  }
+]

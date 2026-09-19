@@ -2,6 +2,11 @@
 
 # This stage is used when running from VS in fast mode (Default for Debug configuration)
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
+# The SQLite database lives in /data rather than next to the app in /app, so a volume mounted at
+# /data persists it without hiding the published files. The directory is created owned by the
+# non-root app user because an empty named volume takes the ownership of the path it's mounted on.
+RUN mkdir /data && chown $APP_UID:$APP_UID /data
+ENV ConnectionStrings__AppDbContext="Data Source=/data/entitydetails.db"
 USER $APP_UID
 WORKDIR /app
 EXPOSE 8080

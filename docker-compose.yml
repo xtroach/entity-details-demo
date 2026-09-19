@@ -1,0 +1,40 @@
+# Runs the full stack in containers, built from the same Dockerfiles as the published images:
+#   docker compose up --build     -> client on http://localhost:8080, API on http://localhost:5080
+#   docker compose down -v        -> also deletes the API's SQLite database volume
+# For day-to-day editing (hot reload, debugging) run the projects directly instead; see README.md.
+#
+# The Blazor client runs in the browser, not in its container, so API_BASE_URL must be an address
+# the browser can reach (the published host port), not the Compose service name http://api:8080.
+# Changing the host ports means updating API_BASE_URL and BlazorClientOrigins__0 to match.
+
+services:
+  api:
+    image: entitydetails-api
+    build:
+      context: .
+      dockerfile: Api/src/EntityDetails.Api/Dockerfile
+    ports:
+      - "5080:8080"
+    environment:
+      # Seeds sample data and serves the OpenAPI document; this file is for local use only.
+      ASPNETCORE_ENVIRONMENT: Development
+      # Replaces the first CORS origin from appsettings.json with the client container's origin.
+      BlazorClientOrigins__0: http://localhost:8080
+    volumes:
+      # The image's connection string points at /data/entitydetails.db.
+      - api-data:/data
+
+  client:
+    image: entitydetails-blazorclient
+    build:
+      context: .
+      dockerfile: BlazorClient/src/EntityDetails.BlazorClient/Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      API_BASE_URL: http://localhost:5080
+    depends_on:
+      - api
+
+volumes:
+  api-data:
