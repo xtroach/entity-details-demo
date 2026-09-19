@@ -1,6 +1,7 @@
 using EntityDetails.Data;
 using EntityDetails.Data.Entities;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.EntityFrameworkCore;
 
 namespace EntityDetails.Api;
 
@@ -55,7 +56,19 @@ public class Program
         // Liveness runs no checks (the process answers); readiness checks the database. Only
         // checks tagged "ready" run on /health/ready.
         builder.Services.AddHealthChecks()
-            .AddDbContextCheck<AppDbContext>(tags: [ReadyTag]);
+            .AddDbContextCheck<AppDbContext>(
+                tags: [ReadyTag],
+                // Opens a connection directly rather than calling CanConnectAsync, which runs through
+                // the retrying execution strategy: with the database down, each readiness request would
+                // otherwise wait through every retry (over a minute) instead of failing within the
+                // connection timeout. A failure throws, which the check reports as Unhealthy.
+                customTestQuery: async (dbContext, cancellationToken) =>
+                {
+                    var connection = dbContext.Database.GetDbConnection();
+                    await connection.OpenAsync(cancellationToken);
+                    await connection.CloseAsync();
+                    return true;
+                });
 
         var blazorClientOrigins = builder.Configuration.GetSection("BlazorClientOrigins").Get<string[]>()
             ?? ["https://localhost:7137", "http://localhost:5286"];
