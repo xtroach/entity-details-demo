@@ -157,3 +157,38 @@ whole solution with `dotnet build` / `dotnet test` from the repo root using
 - `Api`'s `Dockerfile` builds from the repository root (`DockerfileContext`
   is set to the repo root) since it needs the `Api`, `Data`, and `Contracts`
   project files to restore.
+
+## Development Process
+Changes to this repo go through a structured process, not ad-hoc prompting:
+
+- **Design decisions get a paper trail.** Before any non-trivial change,
+  the assistant either scopes it into a GitHub issue first (decision,
+  reasoning, and enough detail to implement later with no memory of the
+  conversation) or, if implementing immediately, writes that same issue
+  before touching any code. Trivial changes (typos, formatting) skip
+  this. Full rules in [`CLAUDE.md`](./CLAUDE.md).
+- **`main` is protected, not just by convention.** All changes land via
+  pull request — enforced by GitHub branch protection (`enforce_admins`
+  on, so this applies to the repo owner too, not just contributors), not
+  merely documented as a policy. Force-pushes and branch deletion on
+  `main` are blocked outright.
+- **Merges never rewrite history.** PRs merge via "Create a merge
+  commit" exclusively — squash and rebase merge are disabled at the
+  repository level, the only GitHub method that never rewrites
+  already-pushed commits. Merged branches auto-delete, which also keeps
+  GitHub's PR-stacking mechanics reliable.
+- **Nothing merges without local verification.** Every PR touching code
+  has had `dotnet build`/`dotnet test` run locally first, with new or
+  changed logic accompanied by tests in the same PR.
+- **Supply-chain and secrets hygiene is on by default.** Dependabot
+  security updates, secret scanning, and push protection are enabled;
+  a committed secret is treated as compromised on sight, not just
+  deleted.
+- **Enforced where possible, self-enforced where not.** Where GitHub can
+  enforce a rule structurally (branch protection, merge method,
+  auto-delete), it does; where it can't yet (build/test verification,
+  test-writing discipline), the assistant follows it consistently and
+  flags genuinely ambiguous cases rather than deciding silently.
+
+The complete, current rule set the assistant follows in this repo lives
+in [`CLAUDE.md`](./CLAUDE.md).
