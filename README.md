@@ -22,6 +22,7 @@ together as the number of entities grows.
 entity-details-demo/
 ├── .editorconfig          # Repo-wide formatting and analyzer (StyleCop) rules
 ├── CLAUDE.md              # Documentation and coding-standard requirements
+├── Directory.Build.props  # MSBuild properties shared by every project (warnings as errors)
 ├── README.md              # This file
 ├── EntityDetailsDemo.slnx # Solution file referencing all 9 projects
 ├── Data/                          # EF Core data-access layer
@@ -89,11 +90,17 @@ whole solution with `dotnet build` / `dotnet test` from the repo root using
   file-scoped namespaces, etc.) are defined in `.editorconfig` and apply
   repo-wide.
 - `Nullable` and `ImplicitUsings` are enabled in every project.
+- Every project builds with `TreatWarningsAsErrors` (set once in
+  `Directory.Build.props`), so any compiler, analyzer, or NuGet warning —
+  including nullable-reference warnings and NuGet vulnerability-audit
+  warnings — fails the build. Diagnostics configured below `warning`
+  severity in `.editorconfig` (`suggestion`/`silent`) are unaffected.
 - XML documentation comments (`///`) are required on public and internal
   types, methods, properties, and events in all `src/` projects, enforced at
   build time via `StyleCop.Analyzers` and the compiler's `CS1591` check
-  (configured in `.editorconfig`). Test projects are exempt — they don't
-  enable documentation generation or reference StyleCop.Analyzers. See
+  (configured in `.editorconfig`; a missing comment fails the build). Test
+  projects are exempt — they don't enable documentation generation or
+  reference StyleCop.Analyzers. See
   `CLAUDE.md` for the full documentation standard.
 - Wire-format types (e.g. `WeatherForecastDto`/`WeatherForecastRequest`) live in
   `Contracts`, referenced by both `Api` and `ApiClient`, so the two can never
