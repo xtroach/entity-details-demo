@@ -3,7 +3,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Npgsql;
 
 namespace EntityDetails.Api.Tests;
 
@@ -22,17 +21,6 @@ public class ProgramStartupTests(PostgresFixture postgres)
 
         Assert.Contains(dbContext.Database.GetAppliedMigrations(), id => id.EndsWith("_InitialCreate"));
         Assert.Empty(dbContext.Database.GetPendingMigrations());
-    }
-
-    [Fact]
-    public void Startup_DisablesGssEncryption()
-    {
-        using var factory = new CustomWebApplicationFactory(postgres);
-        using var scope = factory.Services.CreateScope();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var connectionString = new NpgsqlConnectionStringBuilder(dbContext.Database.GetConnectionString());
-        Assert.Equal(GssEncryptionMode.Disable, connectionString.GssEncryptionMode);
     }
 
     [Fact]

@@ -1,7 +1,5 @@
 using EntityDetails.Data;
 using EntityDetails.Data.Entities;
-using Microsoft.EntityFrameworkCore;
-using Npgsql;
 
 namespace EntityDetails.Api;
 
@@ -16,6 +14,7 @@ public class Program
     /// Configures and starts the web application.
     /// </summary>
     /// <param name="args">The command-line arguments passed to the process.</param>
+    /// <returns>A task that completes when the application shuts down.</returns>
     /// <exception cref="InvalidOperationException">
     /// The <c>ConnectionStrings:AppDbContext</c> setting is missing.
     /// </exception>
@@ -24,7 +23,7 @@ public class Program
     /// (Docker Compose, local development). A multi-instance deployment should apply them in a
     /// deploy step before rollout instead.
     /// </remarks>
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
 
@@ -34,23 +33,11 @@ public class Program
         builder.Services.AddOpenApi();
 
         // No fallback: a deployment without a connection string fails here, at startup, rather than
-        // on its first request.
-        // GSS (Kerberos) encryption is turned off: Npgsql tries it by default, but the ASP.NET runtime
-        // image has no Kerberos library, so every connection would log a libgssapi_krb5 load error
-        // before falling back. Nothing here uses Kerberos; TLS is still negotiated as configured.
-        var connectionString = new NpgsqlConnectionStringBuilder(
-            builder.Configuration.GetConnectionString("AppDbContext")
-                ?? throw new InvalidOperationException(
-                    "The connection string 'ConnectionStrings:AppDbContext' is not configured."))
-        {
-            GssEncryptionMode = GssEncryptionMode.Disable,
-        }.ConnectionString;
-
-        // Managed databases occasionally fail over or drop connections; retrying covers those
-        // transient errors. The app uses no explicit transactions, which this strategy would require
-        // to be wrapped in the strategy's Execute.
-        builder.Services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(connectionString, npgsql => npgsql.EnableRetryOnFailure()));
+        // on its first request. The provider and its settings are the data layer's concern.
+        var connectionString = builder.Configuration.GetConnectionString("AppDbContext")
+            ?? throw new InvalidOperationException(
+                "The connection string 'ConnectionStrings:AppDbContext' is not configured.");
+        builder.Services.AddEntityDetailsData(connectionString);
 
         var blazorClientOrigins = builder.Configuration.GetSection("BlazorClientOrigins").Get<string[]>()
             ?? ["https://localhost:7137", "http://localhost:5286"];
@@ -64,14 +51,11 @@ public class Program
 
         var app = builder.Build();
 
-        using (var scope = app.Services.CreateScope())
+        await app.Services.MigrateEntityDetailsDatabaseAsync();
+        if (app.Environment.IsDevelopment())
         {
-            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            dbContext.Database.Migrate();
-            if (app.Environment.IsDevelopment())
-            {
-                SeedDevelopmentData(dbContext);
-            }
+            using var scope = app.Services.CreateScope();
+            SeedDevelopmentData(scope.ServiceProvider.GetRequiredService<AppDbContext>());
         }
 
         // Configure the HTTP request pipeline.
@@ -88,7 +72,7 @@ public class Program
 
         app.MapControllers();
 
-        app.Run();
+        await app.RunAsync();
     }
 
     private static void SeedDevelopmentData(AppDbContext dbContext)

@@ -23,16 +23,15 @@ public class AppDbContextDesignTimeFactory : IDesignTimeDbContextFactory<AppDbCo
 
     /// <summary>
     /// Creates an <see cref="AppDbContext"/> configured for PostgreSQL against the local Compose
-    /// database.
+    /// database, with the same provider settings as the runtime registration.
     /// </summary>
     /// <param name="args">Arguments passed by the design-time tools; not used.</param>
     /// <returns>A new <see cref="AppDbContext"/> using the Npgsql provider.</returns>
     public AppDbContext CreateDbContext(string[] args)
     {
-        var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(LocalConnectionString)
-            .Options;
+        var options = new DbContextOptionsBuilder<AppDbContext>();
+        AppDbContextOptions.Configure(options, LocalConnectionString);
 
-        return new AppDbContext(options);
+        return new AppDbContext(options.Options);
     }
 }
