@@ -1,2 +1,14 @@
+# Store text files with LF and check them out with LF on every OS, regardless of
+# each machine's core.autocrlf, so the working tree always matches the repository.
+* text=auto eol=lf
+
 # Shell scripts run inside Linux containers, where CRLF line endings break the shebang line.
 *.sh text eol=lf
+
+# Windows batch files need CRLF to run.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Never convert these, even if git's binary detection guesses wrong.
+*.png binary
+*.ico binary

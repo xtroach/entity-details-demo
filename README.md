@@ -22,7 +22,7 @@ together as the number of entities grows.
 entity-details-demo/
 ├── .dockerignore          # Build-context exclusions for every Dockerfile (all build from the root)
 ├── .editorconfig          # Repo-wide formatting and analyzer (StyleCop) rules
-├── .gitattributes         # Forces LF endings for shell scripts that run inside containers
+├── .gitattributes         # Line-ending policy: LF on every OS (CRLF only for .cmd/.bat)
 ├── CLAUDE.md              # Documentation and coding-standard requirements
 ├── Directory.Build.props  # MSBuild properties shared by every project (warnings as errors)
 ├── README.md              # This file
@@ -72,6 +72,16 @@ Prerequisites:
 - Docker Desktop (optional, only needed for the full-stack Compose setup, to
   build the container images, or to run the API's `Container (Dockerfile)`
   launch profile)
+
+No git line-ending configuration is needed: `.gitattributes` checks out every
+file with LF regardless of `core.autocrlf` (see [CodeConventions](#codeconventions)).
+A working copy cloned before that policy existed, or one that shows files
+as modified with an empty diff, can be refreshed with the commands below.
+They discard uncommitted changes to tracked files, so commit or stash first:
+```bash
+git rm -r --cached -q .
+git reset --hard
+```
 
 There are two ways to run the app, for two different jobs.
 
@@ -124,6 +134,17 @@ docker build -f BlazorClient/src/EntityDetails.BlazorClient/Dockerfile -t entity
 - Formatting and language conventions (indentation, brace style, `var` usage,
   file-scoped namespaces, etc.) are defined in `.editorconfig` and apply
   repo-wide.
+- Line endings are LF everywhere, including in Windows working copies.
+  `.gitattributes` (`* text=auto eol=lf`) sets this for every clone,
+  overriding each machine's `core.autocrlf`, and `.editorconfig`
+  (`end_of_line = lf`) makes editors save LF to begin with. Files on disk
+  then match the repository byte for byte on every OS, so git never shows a
+  file as modified with an empty diff, and `docker build` from Windows gets
+  the same LF files the Linux containers need. The one exception is
+  `.cmd`/`.bat`, which are CRLF because Windows needs that to run them.
+- Files are UTF-8 with a BOM (as Visual Studio writes them), except shell
+  scripts: those are UTF-8 without a BOM and LF-only, because a BOM or CRLF
+  before `#!` breaks the shebang inside the container.
 - `Nullable` and `ImplicitUsings` are enabled in every project.
 - Every project builds with `TreatWarningsAsErrors` (set once in
   `Directory.Build.props`), so any compiler, analyzer, or NuGet warning —
