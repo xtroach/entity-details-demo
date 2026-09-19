@@ -26,7 +26,7 @@ entity-details-demo/
 ├── .editorconfig          # Repo-wide formatting and analyzer (StyleCop) rules
 ├── .gitattributes         # Line-ending policy: LF on every OS (CRLF only for .cmd/.bat)
 ├── .github/
-│   ├── workflows/ci.yml   # CI: build, format, test, Docker build and smoke test on every PR
+│   ├── workflows/ci.yml   # CI: build, format, test, Docker build and smoke test on every PR; publishes images on main
 │   ├── scripts/           # Helpers CI runs (Compose smoke test, test-result summary); also runnable locally
 │   ├── dependabot.yml     # Weekly version updates: NuGet, base and Compose images, actions, SDK
 │   └── ISSUE_TEMPLATE/, pull_request_template.md
@@ -556,7 +556,7 @@ debugging with `psql`.
     reference each other without a dependency cycle.
   - Logs go to a Log Analytics workspace (30-day retention).
 - **CI** (`.github/workflows/ci.yml`) runs on every pull request to `main`,
-  every push to `main`, and on demand. It has two jobs, which are also the
+  every push to `main`, and on demand. Its first two jobs are also the
   required status checks on `main`:
   - **Build and test** (Ubuntu). It checks that every committed file is LF
     and has no BOM, compiles and lints the Bicep templates in `infra/`
@@ -573,11 +573,26 @@ debugging with `psql`.
     (which proves the database, migrations and seeding end to end), and
     that the client serves its page, falls back to it for client-side
     routes, and applied `API_BASE_URL`. Run the script locally after
-    `docker compose up -d` to get the same checks.
+    `docker compose up -d` to get the same checks. On `main` it then saves
+    the two images it just tested as a short-lived artifact.
+  - **Publish images** runs only after a merge to `main` (never on PRs, so
+    it isn't a required check and can't block one). It loads *exactly the
+    images the smoke test ran against* and pushes them to GHCR as
+    `ghcr.io/xtroach/entity-details-demo/api` and `…/client`. Each is
+    tagged `sha-<commit>` and `main` (a moving convenience tag), and the
+    job outputs each image's digest (`name@sha256:…`) for deployment.
+    Deploys use that digest, never a tag, so what runs is byte-for-byte
+    what CI tested. Rebuilding in this job would produce the same inputs
+    (everything is pinned) but different digests, and images that were
+    never smoke-tested. Both images carry an
+    `org.opencontainers.image.source` label, which links the packages to
+    this repository. Container Apps pulls them without credentials, so the
+    packages are public.
 
   CI runs on Linux only: that catches case-sensitivity bugs Windows hides,
-  and local verification covers Windows. The workflow has read-only
-  permissions, and its actions are pinned to commit SHAs, because a tag
+  and local verification covers Windows. The workflow's default
+  permissions are read-only. Only the publish job gets `packages: write`,
+  and only on `main`. Its actions are pinned to commit SHAs, because a tag
   can be moved to different code.
 - **Pinned versions.** Builds are reproducible because every input is
   pinned:

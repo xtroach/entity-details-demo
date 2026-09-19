@@ -136,3 +136,68 @@ jobs:
       - name: Stop the stack
         if: ${{ always() }}
         run: docker compose down --volumes
+
+      # On main only: hand the images that just passed the smoke test to the publish job, so exactly
+      # these images are pushed rather than a rebuild. This job keeps its read-only permissions.
+      - name: Save tested images
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: docker save entitydetails-api entitydetails-blazorclient | gzip > images.tar.gz
+
+      - name: Upload tested images
+        if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: images
+          path: images.tar.gz
+          retention-days: 1
+
+  publish:
+    name: Publish images
+    # Runs after a merge to main, never on PRs, so it can't block one and isn't a required check.
+    needs: docker
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # The only job allowed to write packages; the workflow default stays read-only.
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      api-image: ${{ steps.push.outputs.api-image }}
+      client-image: ${{ steps.push.outputs.client-image }}
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: images
+
+      - name: Load tested images
+        run: gunzip -c images.tar.gz | docker load
+
+      - name: Log in to GHCR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      # Tags: sha-<commit> identifies the build; main is a moving convenience tag. Deploys use the
+      # digest written to the outputs, never a tag.
+      - name: Push images
+        id: push
+        run: |
+          registry="ghcr.io/${GITHUB_REPOSITORY,,}"
+          push() {
+            local local_image="$1" name="$2" output="$3"
+            for tag in "sha-$GITHUB_SHA" main; do
+              docker tag "$local_image" "$registry/$name:$tag"
+              docker push --quiet "$registry/$name:$tag"
+            done
+            # RepoDigests can also list the local name (containerd image store), so pick the entry
+            # for the repository just pushed to.
+            local digest
+            digest="$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$registry/$name:sha-$GITHUB_SHA" \
+              | grep --max-count=1 "^$registry/$name@sha256:")"
+            echo "$output=$digest" >> "$GITHUB_OUTPUT"
+            echo "- \`$digest\`" >> "$GITHUB_STEP_SUMMARY"
+          }
+          echo "### Published images" >> "$GITHUB_STEP_SUMMARY"
+          push entitydetails-api api api-image
+          push entitydetails-blazorclient client client-image
