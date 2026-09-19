@@ -5,6 +5,12 @@ using 'main.bicep'
 
 param environmentName = 'staging'
 param aspNetCoreEnvironment = 'Staging'
+
+// Explicit rather than the resource group's region (germanywestcentral): PostgreSQL Flexible Server
+// provisioning became restricted there for this subscription. Check a region with
+// `az postgres flexible-server list-skus --location <region>` (OfferRestricted must be Disabled)
+// before moving; the API and its database stay in the same region.
+param location = 'swedencentral'
 param apiImage = readEnvironmentVariable('API_IMAGE')
 param clientImage = readEnvironmentVariable('CLIENT_IMAGE')
 
