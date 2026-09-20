@@ -58,7 +58,15 @@ jobs:
             Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             Report through the rolling issue labelled `doc-coherence`, exactly as the rubric's
             full-audit table describes. Never close that issue.
+          # Matches the pull-request check's 50, for the reason documented there: --max-turns is a
+          # ceiling the action checks AFTER the run finishes, against the num_turns it reports, so
+          # it has to clear what a complete audit reports rather than what it needs to do the work.
+          # The full audit reads every pair in the rubric's coverage table instead of one diff, so
+          # it reports more turns than the pull-request check, not fewer -- and unlike that check,
+          # this one cannot be exercised before merge, since GitHub registers a workflow_dispatch
+          # workflow only from the default branch. Too low a ceiling here surfaces as a failed
+          # manual dispatch after merge.
           claude_args: |
             --model claude-opus-5
-            --max-turns 40
+            --max-turns 50
             --allowedTools "Read,Grep,Glob,Bash(gh issue list:*),Bash(gh issue view:*),Bash(gh issue create:*),Bash(gh issue edit:*),Bash(gh issue comment:*)"
