@@ -141,35 +141,15 @@ one.
   failing check (skipping tests, loosening a check) without asking
   first.
 - Advisory checks are the runs that aren't required status checks —
-  currently "Docs coherence" (`.github/workflows/docs-coherence.yml`)
-  and CodeQL's default setup ("CodeQL", "Analyze (actions)", "Analyze
-  (csharp)"). GitHub won't block a merge on them, but the *run* and its
-  *findings* are two different things:
-  - **A red, errored or still-pending advisory run means the PR isn't
-    ready**, exactly as a required one does. A check that couldn't run
-    hasn't passed, and reporting green would hide a broken check behind
-    a green tick. Fix the cause so it runs; don't ship past it.
-  - **"Docs coherence" absent or skipped is a fourth state, and it is
-    not a failure.** It runs only on a PR whose base is `main` and which
-    carries the `docs-coherence-review` label, so on an unlabelled PR
-    there is nothing to report and nothing to fix. Don't add the label —
-    asking for the audit is the reviewer's call, and adding it also
-    makes every later push to that PR re-audit. Say plainly that the PR
-    hasn't been audited rather than reporting it as clean, and name the
-    label as what would change that. On a stacked PR nothing will: its
-    base isn't `main`, so labelling it does nothing, and the audit
-    happens on the PR that merges the stack into `main`. Say that
-    instead of pointing at a label that cannot help.
-  - **Its findings are not a merge gate.** A green run that posts a
-    non-empty findings comment doesn't make a PR un-ready. Resolving a
-    documentation contradiction is a judgment call about which document
-    is wrong, and the checker is a model whose findings vary between
-    runs over an unchanged tree — so its output is input to my
-    judgment, never a blocker. Report what it found and let me decide.
+  currently CodeQL's default setup ("CodeQL", "Analyze (actions)",
+  "Analyze (csharp)"), which is configured in repository settings rather
+  than as a committed workflow. GitHub won't block a merge on one, but a
+  red, errored or still-pending advisory run still means the PR isn't
+  ready, exactly as a required one does: a check that couldn't run hasn't
+  passed, and reporting green would hide a broken check behind a green
+  tick. Fix the cause so it runs; don't ship past it.
 - Either class: don't work around a failing check — skipping tests,
-  loosening a check, dropping a step, or removing the
-  `docs-coherence-review` label to stop an audit re-running — without
-  asking first.
+  loosening a check, or dropping a step — without asking first.
 
 ## Tests accompany code changes
 
