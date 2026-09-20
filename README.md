@@ -21,7 +21,7 @@ per entity (e.g. `WeatherForecast/`), so a given entity's files live
 together as the number of entities grows.
 ```
 entity-details-demo/
-├── .claude/skills/doc-coherence/SKILL.md  # Rubric both docs-coherence workflows run (see Development Process)
+├── .claude/skills/doc-coherence/SKILL.md  # Rubric the docs-coherence check runs (see Development Process)
 ├── .config/dotnet-tools.json  # Local .NET tools (dotnet-ef, pinned to the EF Core version)
 ├── .dockerignore          # Build-context exclusions for every Dockerfile (all build from the root)
 ├── .editorconfig          # Repo-wide formatting and analyzer (StyleCop) rules
@@ -29,8 +29,7 @@ entity-details-demo/
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml                    # CI on every PR; on main also publishes the images and deploys to staging
-│   │   ├── docs-coherence.yml        # Docs-coherence check, on PRs into main changing a rule or a file in its paths filter
-│   │   └── docs-coherence-audit.yml  # Full docs-coherence audit of the whole rule set, run on demand
+│   │   └── docs-coherence.yml        # Docs-coherence check, on PRs into main changing a rule or a file in its paths filter
 │   ├── scripts/           # Helpers CI runs (smoke test, staging deploy, test-result summary); also runnable locally
 │   ├── dependabot.yml     # Weekly version updates: NuGet, base and Compose images, actions, SDK
 │   └── ISSUE_TEMPLATE/, pull_request_template.md
@@ -387,20 +386,16 @@ debugging with `psql`.
   deploy time.
 - **User secrets** — `Api`'s project has a `UserSecretsId` configured for
   storing local secrets outside source control via `dotnet user-secrets`.
-- **CLAUDE_CODE_OAUTH_TOKEN** (GitHub Actions repository secret) — what the two
-  docs-coherence workflows authenticate with. It's a Claude subscription token,
+- **CLAUDE_CODE_OAUTH_TOKEN** (GitHub Actions repository secret) — what the
+  docs-coherence workflow authenticates with. It's a Claude subscription token,
   created locally with `claude setup-token` and set with
-  `gh secret set CLAUDE_CODE_OAUTH_TOKEN`, so those runs don't incur separate
-  API billing. A docs-coherence run that fails — a missing credential, a timed-out
-  action — blocks no merge, since neither workflow is a required status check,
-  but it hasn't passed either, so a red run gets reported and judged rather than
-  ignored. They need no other credential and no GitHub App: they pass the
-  built-in `GITHUB_TOKEN` for GitHub operations, so findings are posted by
-  `github-actions[bot]`.
-- **`doc-coherence` label** (`gh label create doc-coherence`) — the full audit
-  reports through the single open issue carrying this label, rewriting its body
-  on each run so it always shows current state. Without the label the audit
-  files a new issue each time it finds something instead of updating one.
+  `gh secret set CLAUDE_CODE_OAUTH_TOKEN`, so those runs draw on a Claude
+  subscription rather than incurring separate API billing. A docs-coherence run
+  that fails — a missing credential, a timed-out action — blocks no merge, since
+  it isn't a required status check, but it hasn't passed either, so a red run
+  gets reported and judged rather than ignored. It needs no other credential and
+  no GitHub App: it passes the built-in `GITHUB_TOKEN` for GitHub operations, so
+  findings are posted by `github-actions[bot]`.
 
 ## Architecture
 - **Data** (`EntityDetails.Data`) is a class library owning `AppDbContext`,
@@ -718,20 +713,19 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   plan.
 - **The rules are audited, not only written down.** The requirement to keep
   `README.md` current is otherwise enforced only by the discipline of the same
-  session that just changed the rule. Two workflows check `CLAUDE.md`,
-  `README.md` and the configuration they describe against each other: one on any
-  PR into `main` that touches a rule document or one of the configuration files
-  named in that workflow's `paths:` filter, and a full audit of the
-  whole rule set, run on demand, reporting through a single rolling issue rather
-  than one comment per run. The full audit deliberately has no schedule yet: the
-  PR check already catches drift at the moment it is introduced, so a recurring
-  sweep would mostly re-report what it has already commented on, and a cadence
-  cannot be tested before it is merged, since GitHub runs scheduled workflows
-  only from the default branch. Neither check can approve anything — they comment
-  and file, because resolving a contradiction is a judgment call about which
-  document is wrong. Neither is a required status check either: one is
-  path-filtered and the other is manual, so they do not report on every PR, and a
-  required check that never reports would block merging forever. A stacked PR is
+  session that just changed the rule. A workflow checks `CLAUDE.md`,
+  `README.md` and the configuration they describe against each other on any PR
+  into `main` that touches a rule document or one of the configuration files
+  named in that workflow's `paths:` filter. Findings live in exactly one place:
+  a comment on the PR that introduced them. There is deliberately no
+  repository-wide sweep and no findings issue — drift is answered for by the
+  change that caused it, or not at all, which means drift sitting in files no PR
+  touches goes unreported. That is the accepted cost of not accumulating issues
+  nobody asked for. The check cannot approve anything either — it comments,
+  because resolving a contradiction is a judgment call about which document is
+  wrong. It is not a required status check: it is path-filtered, so it does not
+  report on every PR, and a required check that never reports would block
+  merging forever. A stacked PR is
   not audited on its own page either, and does not need to be: its content only
   reaches `main` through a PR whose base is `main`, and that PR re-runs the check
   on every push, auditing the combined diff against `main` rather than against an
