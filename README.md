@@ -747,8 +747,9 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   that session, and files nothing. In the workflow it is not run as a skill from
   the checkout: the action restores `CLAUDE.md` and `.claude/` from the base
   branch before it starts, because a PR head is attacker-controlled and the CLI
-  trusts its working directory. The audit reads the PR's copies of its subjects
-  out of git instead; #67 is about making that explicit rather than improvised.
+  trusts its working directory. The PR's own copies are snapshotted under
+  `.claude-pr/`, but nothing points the audit at them yet, so how much of the
+  PR's `CLAUDE.md` a run actually reads isn't pinned down; #67 fixes that.
   The check cannot approve anything either — it comments, because resolving a
   contradiction is a judgment call about which document is wrong. It is not a required status check: whether it runs at all is a
   reviewer's decision, so it does not report on every PR, and a required check

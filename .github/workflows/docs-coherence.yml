@@ -95,8 +95,11 @@ jobs:
           # That guard is correct and stays. The consequence here is that the skill on disk is
           # main's, and CLAUDE.md -- one of the two documents under audit -- is main's too, while
           # README.md is not on that list and is the pull request's. The action does snapshot the
-          # pull request's copies into .claude-pr/, and the audit reads its subjects out of git
-          # rather than off disk. Making that deliberate instead of improvised is #67.
+          # pull request's copies into .claude-pr/, but nothing below points the audit at them,
+          # and the allowlist has no way to read a file at a revision -- git diff and gh pr diff
+          # yield hunks, not files. So the pull request's own CLAUDE.md is fully readable only
+          # through .claude-pr/, and how much of it any given run actually saw is not something
+          # this workflow determines. #67 fixes that by naming .claude-pr/ in the prompt.
           prompt: |
             /doc-coherence
             Mode: pull-request.
