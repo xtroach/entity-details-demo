@@ -739,10 +739,12 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   not audited on its own page either, and does not need to be: its content only
   reaches `main` through a PR whose base is `main`, and that PR re-runs the check
   on every push, auditing the combined diff against `main` rather than against an
-  intermediate branch. That makes it
-  advisory: a red docs-coherence run does not make a PR un-ready the way a red CI
-  job does, but it is reported rather than waved through, so the decision stays
-  with the owner instead of with the check.
+  intermediate branch. What is advisory is what the check *finds*, not whether
+  it ran: a green run that reports contradictions does not make a PR un-ready,
+  because deciding which document is wrong stays with the owner rather than
+  with the check. A red or errored run is the opposite — the audit did not
+  happen, so the cause gets fixed before the PR is called ready, even though
+  GitHub will not block the merge.
 - **Every merge deploys to staging, without stored credentials.** After CI
   passes on `main`, the images it tested are published and deployed to the
   Azure staging environment by digest, migrated before rollout and
