@@ -29,7 +29,7 @@ entity-details-demo/
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml                    # CI on every PR; on main also publishes the images and deploys to staging
-│   │   ├── docs-coherence.yml        # Docs-coherence check, on PRs into main changing a rule or a file it describes
+│   │   ├── docs-coherence.yml        # Docs-coherence check, on PRs into main changing a rule or a file in its paths filter
 │   │   └── docs-coherence-audit.yml  # Full docs-coherence audit of the whole rule set, run on demand
 │   ├── scripts/           # Helpers CI runs (smoke test, staging deploy, test-result summary); also runnable locally
 │   ├── dependabot.yml     # Weekly version updates: NuGet, base and Compose images, actions, SDK
@@ -720,7 +720,8 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   `README.md` current is otherwise enforced only by the discipline of the same
   session that just changed the rule. Two workflows check `CLAUDE.md`,
   `README.md` and the configuration they describe against each other: one on any
-  PR into `main` that touches a rule document or a file it describes, and a full audit of the
+  PR into `main` that touches a rule document or one of the configuration files
+  named in that workflow's `paths:` filter, and a full audit of the
   whole rule set, run on demand, reporting through a single rolling issue rather
   than one comment per run. The full audit deliberately has no schedule yet: the
   PR check already catches drift at the moment it is introduced, so a recurring
