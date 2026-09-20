@@ -392,8 +392,9 @@ debugging with `psql`.
   `gh secret set CLAUDE_CODE_OAUTH_TOKEN`, so those runs draw on a Claude
   subscription rather than incurring separate API billing. A docs-coherence run
   that fails — a missing credential, a timed-out action — blocks no merge, since
-  it isn't a required status check, but it hasn't passed either, so a red run
-  gets reported and judged rather than ignored. It needs no other credential and
+  it isn't a required status check, but it hasn't passed either: the audit did
+  not happen, so the cause gets fixed rather than shipped past. Its *findings*
+  are the advisory part, not the run. It needs no other credential and
   no GitHub App: it passes the built-in `GITHUB_TOKEN` for GitHub operations, so
   findings are posted by `github-actions[bot]`.
 
@@ -601,7 +602,13 @@ debugging with `psql`.
   - Logs go to a Log Analytics workspace (30-day retention).
 - **CI** (`.github/workflows/ci.yml`) runs on every pull request to `main`,
   every push to `main`, and on demand. Its first two jobs are also the
-  required status checks on `main`:
+  **only** required status checks on `main` — everything else that reports on
+  a PR is advisory: "Docs coherence" (below) and CodeQL's default-setup code
+  scanning ("CodeQL", "Analyze (actions)", "Analyze (csharp)"), which runs on
+  every PR and is configured in repository settings rather than as a committed
+  workflow. Advisory means GitHub won't block the merge — not that a red run
+  can be left alone, since a check that couldn't run hasn't audited anything.
+  The required two:
   - **Build and test** (Ubuntu). It checks that every committed file is LF
     and has no BOM, compiles and lints the Bicep templates in `infra/`
     (no Azure login), then verifies formatting, builds in Release (warnings

@@ -138,12 +138,24 @@ one.
   with a red or pending *required* check, and don't work around a
   failing check (skipping tests, loosening a check) without asking
   first.
-- Advisory checks — runs that aren't required status checks, such as
-  `.github/workflows/docs-coherence.yml` — don't gate readiness. They
-  are deliberately non-blocking: a false positive must not be able to
-  wedge a merge. A red advisory run still has to be reported, not
-  passed over — say it's red and why, because a check that couldn't run
-  hasn't passed, and let me decide whether it matters.
+- Advisory checks are the runs that aren't required status checks —
+  currently "Docs coherence" (`.github/workflows/docs-coherence.yml`)
+  and CodeQL's default setup ("CodeQL", "Analyze (actions)", "Analyze
+  (csharp)"). GitHub won't block a merge on them, but the *run* and its
+  *findings* are two different things:
+  - **A red, errored or still-pending advisory run means the PR isn't
+    ready**, exactly as a required one does. A check that couldn't run
+    hasn't passed, and reporting green would hide a broken check behind
+    a green tick. Fix the cause so it runs; don't ship past it.
+  - **Its findings are not a merge gate.** A green run that posts a
+    non-empty findings comment doesn't make a PR un-ready. Resolving a
+    documentation contradiction is a judgment call about which document
+    is wrong, and the checker is a model whose findings vary between
+    runs over an unchanged tree — so its output is input to my
+    judgment, never a blocker. Report what it found and let me decide.
+- Either class: don't work around a failing check — skipping tests,
+  loosening a check, narrowing a path filter or dropping a step to
+  silence it — without asking first.
 
 ## Tests accompany code changes
 

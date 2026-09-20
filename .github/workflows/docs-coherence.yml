@@ -44,6 +44,10 @@ on:
       - "**/Dockerfile"
       # Staging's resources, deploy identity and environment variables are documented in detail.
       - "infra/**"
+      # The rubric itself: README describes what it does and how it reports, so it can drift from
+      # those claims like any other watched file. Without this a pull request changing only the
+      # rubric never runs the check the rubric defines.
+      - ".claude/skills/**"
       - .github/workflows/**
       - .github/dependabot.yml
       - .github/pull_request_template.md

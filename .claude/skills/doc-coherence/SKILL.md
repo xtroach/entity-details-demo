@@ -44,6 +44,7 @@ go is the caller's call; see "Where the findings go".
 | `docker-compose.yml` | the pinned PostgreSQL image, ports and environment either document describes -- including README's rule that a Compose image bump must be hand-copied into `Api.Tests`' `PostgresFixture`, which Dependabot does not update |
 | `**/Dockerfile` | the base-image digest pinning README's "every input is pinned" list and `CLAUDE.md`'s dependency rules claim, and the build stages either document describes |
 | `infra/**` | the Azure resources, deploy identity, federated-credential subject and environment variables README's staging section describes |
+| `.claude/skills/**` | what either document claims this rubric does, how it is invoked and where it reports -- including README's description of the hand-run sweep |
 | `.github/workflows/*.yml` | the CI gates, job names and verification steps either document describes |
 | `.github/dependabot.yml` | the update ecosystems, cadence and coverage either document claims Dependabot keeps current |
 | `.github/pull_request_template.md`, `.github/ISSUE_TEMPLATE/` | the PR and issue shape `CLAUDE.md` requires |
