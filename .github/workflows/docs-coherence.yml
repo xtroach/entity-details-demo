@@ -85,7 +85,18 @@ jobs:
           # whose permission set is far wider than posting one comment needs.
           github_token: ${{ secrets.GITHUB_TOKEN }}
           # Supplying a prompt puts the action in automation mode: it runs on the event itself,
-          # with no @claude mention. The rubric is the checked-out skill.
+          # with no @claude mention.
+          #
+          # The rubric is NOT the checked-out skill, despite appearances. The action treats
+          # CLAUDE.md and .claude/ as security-sensitive (SENSITIVE_PATHS in
+          # src/github/operations/restore-config.ts): on a pull request checkout it deletes the
+          # pull request's copies and restores the base branch's, because the CLI trusts cwd
+          # before any tool-permission gating and a pull request head is attacker-controlled.
+          # That guard is correct and stays. The consequence here is that the skill on disk is
+          # main's, and CLAUDE.md -- one of the two documents under audit -- is main's too, while
+          # README.md is not on that list and is the pull request's. The action does snapshot the
+          # pull request's copies into .claude-pr/, and the audit reads its subjects out of git
+          # rather than off disk. Making that deliberate instead of improvised is #67.
           prompt: |
             /doc-coherence
             Mode: pull-request.
