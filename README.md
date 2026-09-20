@@ -702,12 +702,15 @@ debugging with `psql`.
 ## Development Process
 Changes to this repo go through a structured process, not ad-hoc prompting:
 
-- **Design decisions get a paper trail.** Before any non-trivial change,
-  the assistant either scopes it into a GitHub issue first (decision,
-  reasoning, and enough detail to implement later with no memory of the
-  conversation) or, if implementing immediately, writes that same issue
-  before touching any code. Trivial changes (typos, formatting) skip
-  this. Full rules in [`CLAUDE.md`](./CLAUDE.md).
+- **Design decisions get a paper trail.** Every non-trivial change is
+  scoped into a GitHub issue before any code is written — the decision,
+  the reasoning behind it, and enough detail to implement it later with
+  no memory of the discussion — and the resulting pull request closes
+  that issue. Only genuinely trivial changes skip this, and the bar is
+  deliberately high: a change is trivial only if it touches nothing but
+  prose, comments or formatting and alters nothing a build, a test run,
+  the running app, a container or a contributor's workflow would notice.
+  Build files, container files and CI workflows never qualify.
 - **`main` is protected, not just by convention.** All changes land via
   pull request — enforced by GitHub branch protection (`enforce_admins`
   on, so this applies to the repo owner too, not just contributors), not
@@ -722,9 +725,12 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   "Docker build and smoke test") are required status checks on `main`,
   with branches required to be up to date. A PR can't merge while its
   build, formatting check, tests, or Docker smoke test fail, or before
-  they've finished. The assistant also runs `dotnet build`/`dotnet test`
-  locally before opening a PR, and states the result in the PR's test
-  plan.
+  they've finished. Ahead of that, every PR carrying a change that isn't
+  docs-only must have `dotnet build` and `dotnet test` run locally before
+  it is opened, and says so in its test plan; changes to the Dockerfiles
+  or the Compose stack add a local `docker compose build` and start-up
+  check. Local verification is a rule the test plan records, not
+  something CI can confirm happened.
 - **The rules are audited, not only written down.** The requirement to keep
   `README.md` current is otherwise enforced only by the discipline of the same
   session that just changed the rule. A workflow checks `CLAUDE.md`,

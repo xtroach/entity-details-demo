@@ -4,8 +4,8 @@
 
 Keep README.md current with every change that affects setup, configuration, 
 architecture or functionality update it as part of the same change, not as a follow-up.
-Trivial changes (typo fixes, formatting, internal refactors with no external effect) 
-don't require an update.
+Trivial changes, as "Scope, implement, or trivial" defines them, don't 
+require an update.
 
 Required sections:
 - **Overview** — what the system does and who/what it's for
@@ -50,6 +50,15 @@ Do not leave placeholder or restated-signature summaries (e.g.
 member actually does or represents in context.
 
 Private members should be documented only when their logic is non-obvious.
+
+Two exemptions, both matching what the build actually enforces:
+- Test projects (`*/test/`) are exempt — they enable neither 
+  `GenerateDocumentationFile` nor StyleCop.Analyzers, so nothing checks 
+  them. A `<summary>` on a test class or fixture is welcome where it 
+  explains what the suite covers, but it isn't required.
+- EF Core migrations (`Data/src/EntityDetails.Data/Migrations/`) are 
+  exempt — `.editorconfig` marks them as generated code, because 
+  `dotnet ef` writes them and they aren't edited by hand.
 
 # Code Design
 
@@ -96,23 +105,47 @@ proceed — unless I've already declared one earlier in the conversation
   — no waiting for me to separately reference the issue number.
   Reference the issue from the resulting PR (e.g. "Closes #N") so it
   closes automatically when the PR merges.
-- **Trivial** — no issue, just make the change directly. Reserved for
-  changes on the same scale as what already counts as "trivial" elsewhere
-  in this file (typo fixes, formatting, internal refactors with no
-  external effect). For anything bigger, use Scope or Implement instead
-  of assuming this is trivial.
+- **Trivial** — no issue, just make the change directly. The bar for this
+  one is below.
 
 Whichever I choose, wait for my answer before acting — don't default to
 one.
+
+### What counts as trivial
+
+Nothing is trivial unless it meets *every* one of these:
+
+- The diff touches only documentation prose, code comments, formatting or
+  whitespace, or an internal rename or refactor.
+- It changes nothing a build, a test run, the running app, a container, or
+  a contributor's workflow would notice.
+- It needs no explanation beyond the diff itself — no decision was made
+  that someone would later want the reasoning for.
+
+Anything that fails even one of those is Scope or Implement, however small
+the diff. In particular, a change to `Directory.Build.props`,
+`.editorconfig` severities, `.gitattributes`, a Dockerfile,
+`docker-compose.yml`, `nginx.conf`, a container entrypoint script, a CI
+workflow, a package reference, or a rule in this file is never trivial —
+each one changes what the build, the containers, or the way we work do.
+When in doubt, it isn't trivial.
+
+This is the only definition of "trivial" in this file; everywhere else the
+word appears, it means exactly this.
 
 ## Pull requests only on main/master
 
 - Never commit or push directly to `main` (or `master`), for any change,
   no matter how small.
 - All changes land on a feature branch, pushed, then opened as a pull
-  request (`gh pr create`) with a summary, a `Closes #N` reference, and
-  a test plan (`.github/pull_request_template.md` mirrors this shape for
-  manual/web-UI PR creation). Give me the PR URL when it's ready.
+  request (`gh pr create`) with a summary and a test plan
+  (`.github/pull_request_template.md` mirrors this shape for manual/web-UI
+  PR creation). Give me the PR URL when it's ready.
+- A PR for a change that has an issue — everything that went through Scope
+  or Implement — also carries a `Closes #N` reference, so the issue closes
+  when the PR merges. A Trivial PR has no issue to close, so it says so
+  instead: "Trivial change per CLAUDE.md, no linked issue". One or the
+  other is always present; a PR that has neither is missing something.
 - Do not merge, approve, or close the pull request yourself — that's my
   call. Opening it is the end of the task unless I explicitly ask you to
   merge it too.
@@ -125,11 +158,20 @@ one.
 
 ## Verify before calling a PR ready
 
-- Before opening or updating a PR that touches buildable/testable code
-  (anything under any project's `*/src/` or `*/test/` — not a docs-only
-  change like `CLAUDE.md` or `README.md`), run `dotnet build` and
-  `dotnet test` locally first. Don't describe a change as ready without
-  having done so.
+- Before opening or updating a PR with any change that isn't docs-only,
+  run `dotnet build` and `dotnet test` locally first. Don't describe a
+  change as ready without having done so. Docs-only means `*.md` files and
+  the `.github/` issue and PR templates — nothing else. Everything else
+  qualifies, including the build files that sit outside any project:
+  `Directory.Build.props`, `Directory.Packages.props`, `.editorconfig`,
+  `global.json`, `EntityDetailsDemo.slnx`.
+- When a Dockerfile, `docker-compose.yml`, `nginx.conf`, `.dockerignore`
+  or a container entrypoint script
+  (`BlazorClient/src/EntityDetails.BlazorClient/docker-entrypoint.d/`)
+  changes, also run `docker compose build` and briefly `docker compose up`
+  to confirm the stack still starts. If Docker isn't available in the
+  session, leave it as an unchecked item in the PR's test plan and say
+  that plainly — never phrase it so it reads as verified.
 - State that verification happened, and its result, in the PR description
   or to me directly, rather than leaving it implicit.
 - Local verification comes first, but a PR is only ready once CI
@@ -177,9 +219,8 @@ one.
   corresponding tests in its `*/test/` in the same PR, not as a
   follow-up. This covers new behavior,
   bug fixes (a regression test reproducing the bug), and non-trivial
-  logic changes. Changes on the same scale as what already counts as
-  "trivial" elsewhere in this file (typo fixes, formatting, internal
-  refactors with no external effect) don't need a dedicated test.
+  logic changes. Trivial changes, as "Scope, implement, or trivial"
+  defines them, don't need a dedicated test.
 - If it's genuinely unclear whether a change needs a test, flag it and
   ask rather than silently deciding either way.
 - This is currently a self-enforced expectation, not a measured gate.
