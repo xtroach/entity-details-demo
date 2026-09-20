@@ -717,11 +717,14 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   `README.md` and the configuration they describe against each other on any PR
   into `main` that touches a rule document or one of the configuration files
   named in that workflow's `paths:` filter. Findings live in exactly one place:
-  a comment on the PR that introduced them. There is deliberately no
+  a comment on the PR that introduced them. There is deliberately no automated
   repository-wide sweep and no findings issue — drift is answered for by the
   change that caused it, or not at all, which means drift sitting in files no PR
   touches goes unreported. That is the accepted cost of not accumulating issues
-  nobody asked for. The check cannot approve anything either — it comments,
+  nobody asked for. The rubric is a Claude Code skill
+  (`.claude/skills/doc-coherence/`), so a full sweep of the whole rule set can
+  still be run by hand with `/doc-coherence` when one is wanted; it reports into
+  that session, and files nothing. The check cannot approve anything either — it comments,
   because resolving a contradiction is a judgment call about which document is
   wrong. It is not a required status check: it is path-filtered, so it does not
   report on every PR, and a required check that never reports would block
@@ -729,7 +732,7 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   not audited on its own page either, and does not need to be: its content only
   reaches `main` through a PR whose base is `main`, and that PR re-runs the check
   on every push, auditing the combined diff against `main` rather than against an
-  intermediate branch. That makes them
+  intermediate branch. That makes it
   advisory: a red docs-coherence run does not make a PR un-ready the way a red CI
   job does, but it is reported rather than waved through, so the decision stays
   with the owner instead of with the check.

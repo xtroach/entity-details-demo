@@ -97,8 +97,19 @@ request changed:
    case this mode exists to catch.
 3. Report only findings this pull request introduces or leaves unresolved in the
    files it touched. Drift sitting in files this pull request did not touch is
-   out of scope and is reported nowhere -- there is no repository-wide audit to
-   hand it to, and it is not this pull request's to answer for.
+   out of scope and is reported nowhere -- there is no automated
+   repository-wide audit to hand it to, and it is not this pull request's to
+   answer for.
+
+   **"or leaves unresolved" is deliberate. Do not narrow this rule to what the
+   diff introduces.** It is the only path by which drift older than the pull
+   request is ever reported automatically: every finding type above has
+   `CLAUDE.md` or `README.md` on one side, so once a watched file is touched, a
+   contradiction involving it surfaces whatever change first caused it.
+   Restricting this to introduced findings would read as a harmless
+   clarification and would leave the repository with no automatic route to
+   pre-existing drift at all. The only remaining route would be someone running
+   this rubric by hand.
 
 **Output.** If there are no findings, post nothing at all and say so in the run
 log. If there are findings, post exactly one comment on the pull request with
