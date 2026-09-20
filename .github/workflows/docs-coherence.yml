@@ -95,14 +95,17 @@ jobs:
             Pull request: #${{ github.event.pull_request.number }}
             Post findings as one comment on that pull request. If there are no findings, post
             nothing at all.
-          # --max-turns is a ceiling the action checks AFTER the audit finishes, against the
-          # num_turns the run reports; exceeding it fails the step even when the audit itself
-          # succeeded. At 20 that is exactly what happened -- run 35511209528 posted its findings,
-          # then failed the step reporting num_turns 27 with is_error false. So this has to clear
-          # what a complete audit reports, not what it needs to do the work: the fifteen trigger
-          # paths report more turns than the original eight, and a run with more findings more
-          # again. Re-derive this if the paths list or the rubric's coverage table grows.
+          # There is deliberately no --max-turns. It is not a budget: the action compares the
+          # num_turns a run REPORTS against the ceiling only after that run has finished, so it
+          # cannot stop, shorten or cheapen anything. Run 35511209528 proved it -- at --max-turns
+          # 20 the audit reached 27 turns, returned is_error false, posted its findings comment,
+          # and only then failed the step. The sole effect a ceiling can have here is to turn a
+          # successful audit red. timeout-minutes on the job above is the real runaway guard.
+          #
+          # This matters because CLAUDE.md treats a red advisory run as "not ready": a ceiling
+          # that manufactures false failures would gate readiness on a bookkeeping mismatch,
+          # which is the wedge this check is designed not to be. A red run here should mean
+          # something genuinely went wrong -- a missing credential, a rate limit, an action bug.
           claude_args: |
             --model claude-opus-5
-            --max-turns 50
             --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*)"
