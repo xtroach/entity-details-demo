@@ -51,13 +51,19 @@ concurrency:
 jobs:
   coherence:
     name: Docs coherence
-    # Two event shapes, one gate. On labeled, github.event.label is the label just added; on
-    # synchronize it is null, and the standing labels on the pull request are what decides. There
-    # is no label filter at the `on:` level, so an unrelated label added to any pull request into
-    # main still starts a run -- this skips its only job, which costs nothing and reports nothing.
+    # Two event shapes, one gate, and they must not be collapsed into a single condition. There
+    # is no label filter at the `on:` level, so every label added to any pull request into main
+    # starts a run; this skips the job unless the label just added is the one that asks for an
+    # audit. Testing the standing labels on a labeled event instead would mean that once the
+    # pull request carries docs-coherence-review, adding ANY unrelated label spends a full opus
+    # run and posts a second findings comment -- a no-op that quietly costs what this trigger
+    # exists to save. On synchronize github.event.label is null, so there the standing labels
+    # are what decides.
     if: >-
-      github.event.label.name == 'docs-coherence-review' ||
-      contains(github.event.pull_request.labels.*.name, 'docs-coherence-review')
+      (github.event.action == 'labeled' &&
+      github.event.label.name == 'docs-coherence-review') ||
+      (github.event.action == 'synchronize' &&
+      contains(github.event.pull_request.labels.*.name, 'docs-coherence-review'))
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

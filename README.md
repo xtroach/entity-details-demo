@@ -400,8 +400,9 @@ debugging with `psql`.
 - **`docs-coherence-review`** (GitHub repository label) — what gates that
   workflow. No default: a PR starts without it and is not audited. A reviewer
   adds it to request the audit, after which every push re-audits until it is
-  removed. The label has to exist on the repository for the workflow to be
-  requestable at all.
+  removed. Adding the label is what triggers the audit; adding any other label
+  does not, whether or not this one is already on. The label has to exist on
+  the repository for the workflow to be requestable at all.
 
 ## Architecture
 - **Data** (`EntityDetails.Data`) is a class library owning `AppDbContext`,
@@ -731,7 +732,8 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   into `main` carrying the `docs-coherence-review` label. A reviewer adds the
   label when the diff is worth auditing; until then changes accumulate
   unaudited, and from then on every further push re-audits until the label is
-  removed. That makes requesting the audit a deliberate act rather than a
+  removed. Adding the label and pushing are the only two things that spend a
+  run — other label activity on the PR does not. That makes requesting the audit a deliberate act rather than a
   per-commit reflex — this PR cost thirteen runs before the label existed — at
   the price of making the audit self-enforced: a PR nobody labels is never
   checked. Findings live in exactly one place: a comment on the PR that

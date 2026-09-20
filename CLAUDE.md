@@ -152,9 +152,9 @@ one.
     `docs-coherence-review` label, so on an unlabelled PR there is
     nothing to report and nothing to fix. Don't add the label — asking
     for the audit is the reviewer's call, and adding it also makes
-    every later push re-audit. Say plainly that the PR hasn't been
-    audited rather than reporting it as clean, and mention the label as
-    what would change that.
+    every later push to that PR re-audit. Say plainly that the PR
+    hasn't been audited rather than reporting it as clean, and mention
+    the label as what would change that.
   - **Its findings are not a merge gate.** A green run that posts a
     non-empty findings comment doesn't make a PR un-ready. Resolving a
     documentation contradiction is a judgment call about which document
