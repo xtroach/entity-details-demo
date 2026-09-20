@@ -147,6 +147,14 @@ one.
     ready**, exactly as a required one does. A check that couldn't run
     hasn't passed, and reporting green would hide a broken check behind
     a green tick. Fix the cause so it runs; don't ship past it.
+  - **"Docs coherence" absent or skipped is a fourth state, and it is
+    not a failure.** It only runs on a PR carrying the
+    `docs-coherence-review` label, so on an unlabelled PR there is
+    nothing to report and nothing to fix. Don't add the label — asking
+    for the audit is the reviewer's call, and adding it also makes
+    every later push re-audit. Say plainly that the PR hasn't been
+    audited rather than reporting it as clean, and mention the label as
+    what would change that.
   - **Its findings are not a merge gate.** A green run that posts a
     non-empty findings comment doesn't make a PR un-ready. Resolving a
     documentation contradiction is a judgment call about which document
@@ -154,8 +162,9 @@ one.
     runs over an unchanged tree — so its output is input to my
     judgment, never a blocker. Report what it found and let me decide.
 - Either class: don't work around a failing check — skipping tests,
-  loosening a check, narrowing a path filter or dropping a step to
-  silence it — without asking first.
+  loosening a check, dropping a step, or removing the
+  `docs-coherence-review` label to stop an audit re-running — without
+  asking first.
 
 ## Tests accompany code changes
 

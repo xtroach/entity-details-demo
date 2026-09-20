@@ -29,7 +29,7 @@ entity-details-demo/
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml                    # CI on every PR; on main also publishes the images and deploys to staging
-│   │   └── docs-coherence.yml        # Docs-coherence check, on PRs into main changing a rule or a file in its paths filter
+│   │   └── docs-coherence.yml        # Docs-coherence check, on PRs into main labelled docs-coherence-review
 │   ├── scripts/           # Helpers CI runs (smoke test, staging deploy, test-result summary); also runnable locally
 │   ├── dependabot.yml     # Weekly version updates: NuGet, base and Compose images, actions, SDK
 │   └── ISSUE_TEMPLATE/, pull_request_template.md
@@ -397,6 +397,11 @@ debugging with `psql`.
   are the advisory part, not the run. It needs no other credential and
   no GitHub App: it passes the built-in `GITHUB_TOKEN` for GitHub operations, so
   findings are posted by `github-actions[bot]`.
+- **`docs-coherence-review`** (GitHub repository label) — what gates that
+  workflow. No default: a PR starts without it and is not audited. A reviewer
+  adds it to request the audit, after which every push re-audits until it is
+  removed. The label has to exist on the repository for the workflow to be
+  requestable at all.
 
 ## Architecture
 - **Data** (`EntityDetails.Data`) is a class library owning `AppDbContext`,
@@ -603,11 +608,12 @@ debugging with `psql`.
 - **CI** (`.github/workflows/ci.yml`) runs on every pull request to `main`,
   every push to `main`, and on demand. Its first two jobs are also the
   **only** required status checks on `main` — everything else that reports on
-  a PR is advisory: "Docs coherence" (below) and CodeQL's default-setup code
-  scanning ("CodeQL", "Analyze (actions)", "Analyze (csharp)"), which runs on
-  every PR and is configured in repository settings rather than as a committed
-  workflow. Advisory means GitHub won't block the merge — not that a red run
-  can be left alone, since a check that couldn't run hasn't audited anything.
+  a PR is advisory: "Docs coherence" (below), which runs only on a PR a reviewer
+  has labelled, and CodeQL's default-setup code scanning ("CodeQL", "Analyze
+  (actions)", "Analyze (csharp)"), which runs on every PR and is configured in
+  repository settings rather than as a committed workflow. Advisory means GitHub
+  won't block the merge — not that a red run can be left alone, since a check
+  that couldn't run hasn't audited anything.
   The required two:
   - **Build and test** (Ubuntu). It checks that every committed file is LF
     and has no BOM, compiles and lints the Bicep templates in `infra/`
@@ -721,10 +727,15 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
 - **The rules are audited, not only written down.** The requirement to keep
   `README.md` current is otherwise enforced only by the discipline of the same
   session that just changed the rule. A workflow checks `CLAUDE.md`,
-  `README.md` and the configuration they describe against each other on any PR
-  into `main` that touches a rule document or one of the configuration files
-  named in that workflow's `paths:` filter. Findings live in exactly one place:
-  a comment on the PR that introduced them. There is deliberately no automated
+  `README.md` and the configuration they describe against each other on a PR
+  into `main` carrying the `docs-coherence-review` label. A reviewer adds the
+  label when the diff is worth auditing; until then changes accumulate
+  unaudited, and from then on every further push re-audits until the label is
+  removed. That makes requesting the audit a deliberate act rather than a
+  per-commit reflex — this PR cost thirteen runs before the label existed — at
+  the price of making the audit self-enforced: a PR nobody labels is never
+  checked. Findings live in exactly one place: a comment on the PR that
+  introduced them. There is deliberately no automated
   repository-wide sweep and no findings issue — drift is answered for by the
   change that caused it, or not at all, which means drift sitting in files no PR
   touches goes unreported. That is the accepted cost of not accumulating issues
@@ -733,18 +744,20 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   still be run by hand with `/doc-coherence` when one is wanted; it reports into
   that session, and files nothing. The check cannot approve anything either — it comments,
   because resolving a contradiction is a judgment call about which document is
-  wrong. It is not a required status check: it is path-filtered, so it does not
-  report on every PR, and a required check that never reports would block
-  merging forever. A stacked PR is
-  not audited on its own page either, and does not need to be: its content only
-  reaches `main` through a PR whose base is `main`, and that PR re-runs the check
-  on every push, auditing the combined diff against `main` rather than against an
-  intermediate branch. What is advisory is what the check *finds*, not whether
-  it ran: a green run that reports contradictions does not make a PR un-ready,
-  because deciding which document is wrong stays with the owner rather than
-  with the check. A red or errored run is the opposite — the audit did not
-  happen, so the cause gets fixed before the PR is called ready, even though
-  GitHub will not block the merge.
+  wrong. It is not a required status check: whether it runs at all is a
+  reviewer's decision, so it does not report on every PR, and a required check
+  that never reports would block merging forever. A stacked PR is not audited on
+  its own page either, and does not need to be: its content only reaches `main`
+  through a PR whose base is `main`, and labelling that PR audits the combined
+  diff against `main` rather than against an intermediate branch. Once the check
+  has run, what is advisory is what it *finds*, not the run: a green run that
+  reports contradictions does not make a PR un-ready, because deciding which
+  document is wrong stays with the owner rather than with the check. A red or
+  errored run is the opposite — the audit did not happen, so the cause gets
+  fixed before the PR is called ready, even though GitHub will not block the
+  merge. A run that never happened at all is a third case and neither of those:
+  on an unlabelled PR nothing failed and there is nothing to fix, but nothing
+  was audited either, and that is stated rather than reported as clean.
 - **Every merge deploys to staging, without stored credentials.** After CI
   passes on `main`, the images it tested are published and deployed to the
   Azure staging environment by digest, migrated before rollout and
@@ -763,7 +776,8 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
 - **Enforced where possible, self-enforced where not.** Where GitHub can
   enforce a rule structurally, it does: branch protection, required CI
   checks, merge method, auto-delete. The rest is self-enforced: tests
-  accompanying code changes, and the Scope/Implement/Trivial choice. There,
+  accompanying code changes, the Scope/Implement/Trivial choice, and asking
+  for the docs-coherence audit by labelling the PR. There,
   the assistant follows the rule consistently and flags genuinely
   ambiguous cases rather than deciding silently.
 
