@@ -3,31 +3,33 @@
 ## README.md
 
 Keep README.md current with every change that affects setup, configuration, 
-architecture, functionality, or how changes are made and reviewed — 
-update it as part of the same change, not as a follow-up. Trivial changes 
-(typo fixes, formatting, internal refactors with no external effect) 
+architecture or functionality update it as part of the same change, not as a follow-up.
+Trivial changes (typo fixes, formatting, internal refactors with no external effect) 
 don't require an update.
 
 Required sections:
 - **Overview** — what the system does and who/what it's for
-- **Folder Structure** Overview of the folder structure and organization of the project
 - **Setup** — steps to get a dev environment running (prerequisites, install, 
   first run)
+- **Folder Structure** Overview of the folder structure and organization of the project
 - **CodeConventions** - Synopsis of code conventions, for quick reference
   without reading `.editorconfig` directly
 - **Configuration** — environment variables, config files, and settings that 
   affect behavior, with defaults noted
 - **Architecture** — high-level structure: main components/projects, how 
   they interact, key design decisions
-- **Development Process** — how changes get made and reviewed: the
-  Scope/Implement/Trivial workflow, PR-only-to-main and the GitHub
-  settings enforcing it (branch protection, merge method, auto-delete),
-  and the reasoning behind them — written for a reader evaluating how
-  this project is built, not as agent instructions (that's what this
-  file is for)
 
-If a change doesn't fit an existing section, extend it rather than adding 
-new top-level sections without cause. Keep entries current rather than 
+README.md must not document or describe the configuration, rules, instructions,
+or implementation that govern the behavior of AI agents interacting with this repository.
+
+README.md must document the content and externally relevant behavior of the project, 
+not the infrastructure used to develop, validate, or govern the repository.
+This exclusion includes CLAUDE.md, agent skills, prompts, agent configuration, 
+documentation-coherence rules, CI workflows that implement those rules,
+and other infrastructure whose purpose is to govern or validate AI-agent behavior or 
+the documentation system itself.
+
+Do not append top-level sections without explicit requirement. Keep entries current rather than 
 appending a changelog-style history — README.md reflects the system as it 
 is now, not what changed when.
 
