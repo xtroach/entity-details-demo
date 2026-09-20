@@ -1,6 +1,6 @@
 # Audits the rule documents against each other when a pull request changes one of them, or changes
 # configuration those documents describe. The rubric lives in .claude/skills/doc-coherence/SKILL.md,
-# shared with the daily audit workflow.
+# shared with the on-demand full-audit workflow.
 #
 # Deliberately NOT a required status check on main, for two independent reasons:
 #   - It is path-filtered, so on a pull request touching none of these files it never reports at

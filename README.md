@@ -30,7 +30,7 @@ entity-details-demo/
 │   ├── workflows/
 │   │   ├── ci.yml                    # CI on every PR; on main also publishes the images and deploys to staging
 │   │   ├── docs-coherence.yml        # Docs-coherence check, on PRs changing a rule or a file it describes
-│   │   └── docs-coherence-audit.yml  # Daily full docs-coherence audit
+│   │   └── docs-coherence-audit.yml  # Full docs-coherence audit of the whole rule set, run on demand
 │   ├── scripts/           # Helpers CI runs (smoke test, staging deploy, test-result summary); also runnable locally
 │   ├── dependabot.yml     # Weekly version updates: NuGet, base and Compose images, actions, SDK
 │   └── ISSUE_TEMPLATE/, pull_request_template.md
@@ -395,10 +395,10 @@ debugging with `psql`.
   since neither is a required status check. They need no other credential and no
   GitHub App: they pass the built-in `GITHUB_TOKEN` for GitHub operations, so
   findings are posted by `github-actions[bot]`.
-- **`doc-coherence` label** (`gh label create doc-coherence`) — the daily audit
+- **`doc-coherence` label** (`gh label create doc-coherence`) — the full audit
   reports through the single open issue carrying this label, rewriting its body
   on each run so it always shows current state. Without the label the audit
-  files a new issue every day it finds something instead of updating one.
+  files a new issue each time it finds something instead of updating one.
 
 ## Architecture
 - **Data** (`EntityDetails.Data`) is a class library owning `AppDbContext`,
@@ -718,13 +718,17 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   `README.md` current is otherwise enforced only by the discipline of the same
   session that just changed the rule. Two workflows check `CLAUDE.md`,
   `README.md` and the configuration they describe against each other: one on any
-  PR that touches a rule document or a file it describes, and a full audit daily
-  that reports through a single rolling issue rather than a daily comment.
-  Neither can approve anything — they comment and file, because resolving a
-  contradiction is a judgment call about which document is wrong. Neither is a
-  required status check either: both are path-filtered or scheduled, so they
-  don't report on every PR, and a required check that never reports would block
-  merging forever.
+  PR that touches a rule document or a file it describes, and a full audit of the
+  whole rule set, run on demand, reporting through a single rolling issue rather
+  than one comment per run. The full audit deliberately has no schedule yet: the
+  PR check already catches drift at the moment it is introduced, so a recurring
+  sweep would mostly re-report what it has already commented on, and a cadence
+  cannot be tested before it is merged, since GitHub runs scheduled workflows
+  only from the default branch. Neither check can approve anything — they comment
+  and file, because resolving a contradiction is a judgment call about which
+  document is wrong. Neither is a required status check either: one is
+  path-filtered and the other is manual, so they do not report on every PR, and a
+  required check that never reports would block merging forever.
 - **Every merge deploys to staging, without stored credentials.** After CI
   passes on `main`, the images it tested are published and deployed to the
   Azure staging environment by digest, migrated before rollout and

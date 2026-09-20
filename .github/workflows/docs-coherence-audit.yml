@@ -1,18 +1,21 @@
-# Daily full audit of the rule set: CLAUDE.md and README.md against each other, against themselves,
-# and against the configuration they describe. The rubric lives in
+# Full audit of the rule set: CLAUDE.md and README.md against each other, against themselves, and
+# against the configuration they describe. The rubric lives in
 # .claude/skills/doc-coherence/SKILL.md, shared with the per-pull-request workflow.
 #
+# Run on demand only, deliberately: there is no `schedule:` here. The per-pull-request workflow
+# already audits drift at the moment it is introduced, and almost every change to a rule document
+# or a file it describes arrives through a pull request, so a recurring sweep would mostly re-report
+# what that check already commented on. The rolling-issue protocol below is also prompt-enforced
+# rather than mechanical, and GitHub runs scheduled workflows only from the default branch, so a
+# cadence cannot be tested before it is merged. Add a `schedule:` once the pull-request check has a
+# track record and this protocol has been watched working.
+#
 # Findings are reported through a single rolling issue labelled `doc-coherence`, whose body each run
-# rewrites, rather than a daily comment. Drift that persists for weeks then produces one issue, not
-# thirty notifications. The audit never closes that issue — that is the owner's call.
+# rewrites, rather than one comment per run. Drift that survives several audits then produces one
+# issue, not a notification every time. The audit never closes that issue — that is the owner's call.
 name: Docs coherence audit
 
 on:
-  schedule:
-    # 05:00 UTC daily. GitHub runs scheduled workflows only from the default branch, and attributes
-    # the run to whoever last changed this cron line; the action rejects bot actors, so if that ever
-    # becomes a bot the run needs an `allowed_bots` entry.
-    - cron: "0 5 * * *"
   workflow_dispatch:
 
 # Least privilege: read the repository, and write only the rolling findings issue.
@@ -20,8 +23,8 @@ permissions:
   contents: read
   issues: write
 
-# One audit at a time. A manual run while the scheduled one is working waits rather than racing it
-# for the rolling issue.
+# One audit at a time. A second dispatch while one is working waits rather than racing it for the
+# rolling issue.
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
@@ -50,11 +53,11 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           prompt: |
             /doc-coherence
-            Mode: daily-audit.
+            Mode: full-audit.
             Audit the whole rule set, not a diff.
             Run URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
             Report through the rolling issue labelled `doc-coherence`, exactly as the rubric's
-            daily-audit table describes. Never close that issue.
+            full-audit table describes. Never close that issue.
           claude_args: |
             --model claude-opus-5
             --max-turns 40

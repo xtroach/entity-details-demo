@@ -1,6 +1,6 @@
 ---
 name: doc-coherence
-description: Audit CLAUDE.md, README.md and the configuration files they describe for contradictions with each other and with what the repository actually enforces. Used by the docs-coherence workflows, on a pull request and as a daily full-repository audit.
+description: Audit CLAUDE.md, README.md and the configuration files they describe for contradictions with each other and with what the repository actually enforces. Used by the docs-coherence workflows, on a pull request and as an on-demand full-repository audit.
 ---
 
 # Documentation coherence audit
@@ -89,7 +89,7 @@ request changed:
    case this mode exists to catch.
 3. Report only findings this pull request introduces or leaves unresolved in the
    files it touched. Pre-existing drift elsewhere in the repository belongs to
-   the daily audit, not to this pull request.
+   the full audit, not to this pull request.
 
 **Output.** If there are no findings, post nothing at all and say so in the run
 log. If there are findings, post exactly one comment on the pull request with
@@ -105,7 +105,7 @@ Not a blocking check — see [#62](https://github.com/xtroach/entity-details-dem
 Resolving a contradiction is a judgment call about which document is wrong.
 ```
 
-## Mode: daily-audit
+## Mode: full-audit
 
 Audit the whole rule set rather than a diff: every pair in the coverage table
 above. Report through a single rolling issue labelled `doc-coherence`, found
@@ -119,8 +119,8 @@ with `gh issue list --label doc-coherence --state open`.
 | no | no | Nothing. Do not open an issue to say everything is fine. |
 
 Replacing the body rather than adding a comment is deliberate: the issue always
-shows current state, and a finding that persists for weeks does not generate a
-notification every morning.
+shows current state, and a finding that survives several audits does not generate
+a fresh notification each time.
 
 Title the issue `Documentation coherence: <n> open finding(s)`. Body:
 
