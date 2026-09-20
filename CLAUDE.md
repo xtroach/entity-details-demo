@@ -135,8 +135,15 @@ one.
   test", "Docker build and smoke test") are required status checks on
   `main`, so GitHub blocks merging while either is red or still running.
   If CI fails, fix the cause and push again. Never call a PR ready
-  with a red or pending run, and don't work around a failing check
-  (skipping tests, loosening a check) without asking first.
+  with a red or pending *required* check, and don't work around a
+  failing check (skipping tests, loosening a check) without asking
+  first.
+- Advisory checks — runs that aren't required status checks, such as
+  `.github/workflows/docs-coherence.yml` — don't gate readiness. They
+  are deliberately non-blocking: a false positive must not be able to
+  wedge a merge. A red advisory run still has to be reported, not
+  passed over — say it's red and why, because a check that couldn't run
+  hasn't passed, and let me decide whether it matters.
 
 ## Tests accompany code changes
 

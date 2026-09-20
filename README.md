@@ -391,10 +391,12 @@ debugging with `psql`.
   docs-coherence workflows authenticate with. It's a Claude subscription token,
   created locally with `claude setup-token` and set with
   `gh secret set CLAUDE_CODE_OAUTH_TOKEN`, so those runs don't incur separate
-  API billing. Until it's set both workflows fail; nothing else is affected,
-  since neither is a required status check. They need no other credential and no
-  GitHub App: they pass the built-in `GITHUB_TOKEN` for GitHub operations, so
-  findings are posted by `github-actions[bot]`.
+  API billing. A docs-coherence run that fails — a missing credential, a timed-out
+  action — blocks no merge, since neither workflow is a required status check,
+  but it hasn't passed either, so a red run gets reported and judged rather than
+  ignored. They need no other credential and no GitHub App: they pass the
+  built-in `GITHUB_TOKEN` for GitHub operations, so findings are posted by
+  `github-actions[bot]`.
 - **`doc-coherence` label** (`gh label create doc-coherence`) — the full audit
   reports through the single open issue carrying this label, rewriting its body
   on each run so it always shows current state. Without the label the audit
@@ -728,7 +730,10 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   and file, because resolving a contradiction is a judgment call about which
   document is wrong. Neither is a required status check either: one is
   path-filtered and the other is manual, so they do not report on every PR, and a
-  required check that never reports would block merging forever.
+  required check that never reports would block merging forever. That makes them
+  advisory: a red docs-coherence run does not make a PR un-ready the way a red CI
+  job does, but it is reported rather than waved through, so the decision stays
+  with the owner instead of with the check.
 - **Every merge deploys to staging, without stored credentials.** After CI
   passes on `main`, the images it tested are published and deployed to the
   Azure staging environment by digest, migrated before rollout and
