@@ -40,38 +40,14 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      # The audit authenticates with a subscription token the repository owner sets; README's
-      # Configuration section covers it. Without that secret the action aborts on a validation
-      # error, so every pull request touching a rule document would carry a red X meaning "not
-      # configured" rather than "found a contradiction" — on a check that is deliberately not
-      # required, so nothing is gated on it and nobody can act on the red. A check that is red for
-      # an unactionable reason is one people learn to ignore, which is exactly the outcome this
-      # workflow exists to prevent. So skip, and annotate the run with why it skipped.
-      #
-      # The `secrets` context is unavailable in an `if:` condition, which is why the token is
-      # probed through a step env var feeding a step output rather than tested directly.
-      - id: auth
-        name: Check for the audit credential
-        env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-        run: |
-          if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
-            echo 'configured=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'configured=false' >> "$GITHUB_OUTPUT"
-            echo '::notice title=Docs coherence skipped::CLAUDE_CODE_OAUTH_TOKEN is not set on this repository, so the rule documents were not audited. Create the token with "claude setup-token", then "gh secret set CLAUDE_CODE_OAUTH_TOKEN".'
-          fi
-
       # Third-party actions are pinned to full commit SHAs (tags can be moved); Dependabot updates them.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: steps.auth.outputs.configured == 'true'
         with:
           # The rubric diffs the pull request against its merge base, so the history has to be there.
           fetch-depth: 0
           persist-credentials: false
 
       - uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1
-        if: steps.auth.outputs.configured == 'true'
         env:
           # gh reads GH_TOKEN; the allowlist below limits it to commenting on this pull request.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

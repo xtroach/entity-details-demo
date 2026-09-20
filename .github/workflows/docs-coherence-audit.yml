@@ -32,34 +32,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     steps:
-      # Same credential gate as the per-pull-request workflow, for a different reason: this one runs
-      # unattended every morning, so a missing secret would otherwise mean a failure email a day,
-      # for a condition only a repository setting can fix. Skipping with an annotation reports the
-      # same fact once per run without the alarm. See README's Configuration section.
-      #
-      # The `secrets` context is unavailable in an `if:` condition, which is why the token is
-      # probed through a step env var feeding a step output rather than tested directly.
-      - id: auth
-        name: Check for the audit credential
-        env:
-          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-        run: |
-          if [ -n "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
-            echo 'configured=true' >> "$GITHUB_OUTPUT"
-          else
-            echo 'configured=false' >> "$GITHUB_OUTPUT"
-            echo '::notice title=Docs coherence audit skipped::CLAUDE_CODE_OAUTH_TOKEN is not set on this repository, so the rule set was not audited. Create the token with "claude setup-token", then "gh secret set CLAUDE_CODE_OAUTH_TOKEN".'
-          fi
-
       # Third-party actions are pinned to full commit SHAs (tags can be moved); Dependabot updates them.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        if: steps.auth.outputs.configured == 'true'
         with:
           fetch-depth: 1
           persist-credentials: false
 
       - uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1
-        if: steps.auth.outputs.configured == 'true'
         env:
           # gh reads GH_TOKEN; the allowlist below limits it to the issue operations the rubric needs.
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

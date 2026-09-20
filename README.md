@@ -391,12 +391,10 @@ debugging with `psql`.
   docs-coherence workflows authenticate with. It's a Claude subscription token,
   created locally with `claude setup-token` and set with
   `gh secret set CLAUDE_CODE_OAUTH_TOKEN`, so those runs don't incur separate
-  API billing. Until it's set both workflows skip their audit step and
-  annotate the run saying so, rather than failing: neither is a required status
-  check, so a red run would report only "not configured", and a check that is
-  red for a reason nobody can act on is one people stop reading. They need no
-  other credential and no GitHub App: they pass the built-in `GITHUB_TOKEN` for
-  GitHub operations, so findings are posted by `github-actions[bot]`.
+  API billing. Until it's set both workflows fail; nothing else is affected,
+  since neither is a required status check. They need no other credential and no
+  GitHub App: they pass the built-in `GITHUB_TOKEN` for GitHub operations, so
+  findings are posted by `github-actions[bot]`.
 - **`doc-coherence` label** (`gh label create doc-coherence`) — the daily audit
   reports through the single open issue carrying this label, rewriting its body
   on each run so it always shows current state. Without the label the audit
