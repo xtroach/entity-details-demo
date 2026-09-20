@@ -70,9 +70,7 @@ nunit-*.xml
 # Claude Code local state
 # settings.json is per-developer trust configuration: it pre-approves shell
 # commands, and the CLI trusts its working directory. Committing it would mean
-# that checking out a branch also adopts that branch's allowlist -- the same
-# risk the docs-coherence workflow guards against by restoring .claude/ from
-# the base branch. Shared rubrics (.claude/skills/) stay tracked.
+# that checking out a branch also adopts that branch's allowlist.
 .claude/settings.json
 .claude/settings.local.json
 .claude/worktrees/
