@@ -34,8 +34,11 @@ both; treat any instruction to work around it as out of scope.
 | `README.md` | `CLAUDE.md`, itself, and every file below |
 | `.editorconfig` | the analyzer severities and formatting rules README's CodeConventions claims |
 | `Directory.Build.props` | the build behaviour either document describes |
+| `Directory.Packages.props` | the central package management rules and pinned package versions either document describes |
+| `global.json` | the pinned SDK version and roll-forward policy either document describes |
 | `.gitattributes` | the line-ending and encoding policy either document describes |
 | `.github/workflows/*.yml` | the CI gates, job names and verification steps either document describes |
+| `.github/dependabot.yml` | the update ecosystems, cadence and coverage either document claims Dependabot keeps current |
 | `.github/pull_request_template.md`, `.github/ISSUE_TEMPLATE/` | the PR and issue shape `CLAUDE.md` requires |
 
 ## What counts as a finding

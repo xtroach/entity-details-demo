@@ -19,8 +19,11 @@ on:
       - README.md
       - .editorconfig
       - Directory.Build.props
+      - Directory.Packages.props
       - .gitattributes
+      - global.json
       - .github/workflows/**
+      - .github/dependabot.yml
       - .github/pull_request_template.md
       - .github/ISSUE_TEMPLATE/**
 
