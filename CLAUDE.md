@@ -148,13 +148,16 @@ one.
     hasn't passed, and reporting green would hide a broken check behind
     a green tick. Fix the cause so it runs; don't ship past it.
   - **"Docs coherence" absent or skipped is a fourth state, and it is
-    not a failure.** It only runs on a PR carrying the
-    `docs-coherence-review` label, so on an unlabelled PR there is
-    nothing to report and nothing to fix. Don't add the label — asking
-    for the audit is the reviewer's call, and adding it also makes
-    every later push to that PR re-audit. Say plainly that the PR
-    hasn't been audited rather than reporting it as clean, and mention
-    the label as what would change that.
+    not a failure.** It runs only on a PR whose base is `main` and which
+    carries the `docs-coherence-review` label, so on an unlabelled PR
+    there is nothing to report and nothing to fix. Don't add the label —
+    asking for the audit is the reviewer's call, and adding it also
+    makes every later push to that PR re-audit. Say plainly that the PR
+    hasn't been audited rather than reporting it as clean, and name the
+    label as what would change that. On a stacked PR nothing will: its
+    base isn't `main`, so labelling it does nothing, and the audit
+    happens on the PR that merges the stack into `main`. Say that
+    instead of pointing at a label that cannot help.
   - **Its findings are not a merge gate.** A green run that posts a
     non-empty findings comment doesn't make a PR un-ready. Resolving a
     documentation contradiction is a judgment call about which document
