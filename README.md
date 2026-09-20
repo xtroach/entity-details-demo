@@ -21,12 +21,15 @@ per entity (e.g. `WeatherForecast/`), so a given entity's files live
 together as the number of entities grows.
 ```
 entity-details-demo/
+├── .claude/skills/doc-coherence/SKILL.md  # Rubric the docs-coherence check runs (see Development Process)
 ├── .config/dotnet-tools.json  # Local .NET tools (dotnet-ef, pinned to the EF Core version)
 ├── .dockerignore          # Build-context exclusions for every Dockerfile (all build from the root)
 ├── .editorconfig          # Repo-wide formatting and analyzer (StyleCop) rules
 ├── .gitattributes         # Line-ending policy: LF on every OS (CRLF only for .cmd/.bat)
 ├── .github/
-│   ├── workflows/ci.yml   # CI on every PR; on main also publishes the images and deploys to staging
+│   ├── workflows/
+│   │   ├── ci.yml                    # CI on every PR; on main also publishes the images and deploys to staging
+│   │   └── docs-coherence.yml        # Docs-coherence check, on PRs into main labelled docs-coherence-review
 │   ├── scripts/           # Helpers CI runs (smoke test, staging deploy, test-result summary); also runnable locally
 │   ├── dependabot.yml     # Weekly version updates: NuGet, base and Compose images, actions, SDK
 │   └── ISSUE_TEMPLATE/, pull_request_template.md
@@ -383,6 +386,23 @@ debugging with `psql`.
   deploy time.
 - **User secrets** — `Api`'s project has a `UserSecretsId` configured for
   storing local secrets outside source control via `dotnet user-secrets`.
+- **CLAUDE_CODE_OAUTH_TOKEN** (GitHub Actions repository secret) — what the
+  docs-coherence workflow authenticates with. It's a Claude subscription token,
+  created locally with `claude setup-token` and set with
+  `gh secret set CLAUDE_CODE_OAUTH_TOKEN`, so those runs draw on a Claude
+  subscription rather than incurring separate API billing. A docs-coherence run
+  that fails — a missing credential, a timed-out action — blocks no merge, since
+  it isn't a required status check, but it hasn't passed either: the audit did
+  not happen, so the cause gets fixed rather than shipped past. Its *findings*
+  are the advisory part, not the run. It needs no other credential and
+  no GitHub App: it passes the built-in `GITHUB_TOKEN` for GitHub operations, so
+  findings are posted by `github-actions[bot]`.
+- **`docs-coherence-review`** (GitHub repository label) — what gates that
+  workflow. No default: a PR starts without it and is not audited. A reviewer
+  adds it to request the audit, after which every push re-audits until it is
+  removed. Adding the label is what triggers the audit; adding any other label
+  does not, whether or not this one is already on. The label has to exist on
+  the repository for the workflow to be requestable at all.
 
 ## Architecture
 - **Data** (`EntityDetails.Data`) is a class library owning `AppDbContext`,
@@ -588,7 +608,14 @@ debugging with `psql`.
   - Logs go to a Log Analytics workspace (30-day retention).
 - **CI** (`.github/workflows/ci.yml`) runs on every pull request to `main`,
   every push to `main`, and on demand. Its first two jobs are also the
-  required status checks on `main`:
+  **only** required status checks on `main` — everything else that reports on
+  a PR is advisory: "Docs coherence" (below), which runs only on a PR a reviewer
+  has labelled, and CodeQL's default-setup code scanning ("CodeQL", "Analyze
+  (actions)", "Analyze (csharp)"), which runs on every PR and is configured in
+  repository settings rather than as a committed workflow. Advisory means GitHub
+  won't block the merge — not that a red run can be left alone, since a check
+  that couldn't run hasn't audited anything.
+  The required two:
   - **Build and test** (Ubuntu). It checks that every committed file is LF
     and has no BOM, compiles and lints the Bicep templates in `infra/`
     (no Azure login), then verifies formatting, builds in Release (warnings
@@ -698,6 +725,46 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   they've finished. The assistant also runs `dotnet build`/`dotnet test`
   locally before opening a PR, and states the result in the PR's test
   plan.
+- **The rules are audited, not only written down.** The requirement to keep
+  `README.md` current is otherwise enforced only by the discipline of the same
+  session that just changed the rule. A workflow checks `CLAUDE.md`,
+  `README.md` and the configuration they describe against each other on a PR
+  into `main` carrying the `docs-coherence-review` label. A reviewer adds the
+  label when the diff is worth auditing; until then changes accumulate
+  unaudited, and from then on every further push re-audits until the label is
+  removed. Adding the label and pushing are the only two things that spend a
+  run — other label activity on the PR does not. That makes requesting the audit a deliberate act rather than a
+  per-commit reflex — this PR cost thirteen runs before the label existed — at
+  the price of making the audit self-enforced: a PR nobody labels is never
+  checked. Findings live in exactly one place: a comment on the PR that
+  introduced them. There is deliberately no automated
+  repository-wide sweep and no findings issue — drift is answered for by the
+  change that caused it, or not at all, which means drift sitting in files no PR
+  touches goes unreported. That is the accepted cost of not accumulating issues
+  nobody asked for. The rubric is a Claude Code skill
+  (`.claude/skills/doc-coherence/`), so a full sweep of the whole rule set can
+  still be run by hand with `/doc-coherence` when one is wanted; it reports into
+  that session, and files nothing. In the workflow it is not run as a skill from
+  the checkout: the action restores `CLAUDE.md` and `.claude/` from the base
+  branch before it starts, because a PR head is attacker-controlled and the CLI
+  trusts its working directory. The PR's own copies are snapshotted under
+  `.claude-pr/`, but nothing points the audit at them yet, so how much of the
+  PR's `CLAUDE.md` a run actually reads isn't pinned down; #67 fixes that.
+  The check cannot approve anything either — it comments, because resolving a
+  contradiction is a judgment call about which document is wrong. It is not a required status check: whether it runs at all is a
+  reviewer's decision, so it does not report on every PR, and a required check
+  that never reports would block merging forever. A stacked PR is not audited on
+  its own page either, and does not need to be: its content only reaches `main`
+  through a PR whose base is `main`, and labelling that PR audits the combined
+  diff against `main` rather than against an intermediate branch. Once the check
+  has run, what is advisory is what it *finds*, not the run: a green run that
+  reports contradictions does not make a PR un-ready, because deciding which
+  document is wrong stays with the owner rather than with the check. A red or
+  errored run is the opposite — the audit did not happen, so the cause gets
+  fixed before the PR is called ready, even though GitHub will not block the
+  merge. A run that never happened at all is a third case and neither of those:
+  on an unlabelled PR nothing failed and there is nothing to fix, but nothing
+  was audited either, and that is stated rather than reported as clean.
 - **Every merge deploys to staging, without stored credentials.** After CI
   passes on `main`, the images it tested are published and deployed to the
   Azure staging environment by digest, migrated before rollout and
@@ -718,7 +785,11 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
   checks, merge method, auto-delete. The rest is self-enforced: tests
   accompanying code changes, and the Scope/Implement/Trivial choice. There,
   the assistant follows the rule consistently and flags genuinely
-  ambiguous cases rather than deciding silently.
+  ambiguous cases rather than deciding silently. Requesting the
+  docs-coherence audit is self-enforced too, but by the reviewer rather than
+  the assistant — nothing makes a PR get labelled, and the assistant does not
+  label one itself, because deciding the diff is worth auditing is the same
+  judgment call as deciding which document a finding means is wrong.
 
 The complete, current rule set the assistant follows in this repo lives
 in [`CLAUDE.md`](./CLAUDE.md).

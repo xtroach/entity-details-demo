@@ -1,0 +1,123 @@
+# Audits the rule documents against each other, and against the configuration they describe, on a
+# pull request carrying the docs-coherence-review label. The rubric lives in
+# .claude/skills/doc-coherence/SKILL.md.
+#
+# The label is the trigger, deliberately, because the audit is an opus run and a pull request is
+# not one commit. Auditing every push spent one run per increment on diffs nobody had reviewed
+# yet -- this pull request alone burned thirteen. Changes now accumulate unaudited until a
+# reviewer asks for the audit by adding the label; from that point the label stays on and every
+# further push re-audits, so a fix made in response to findings is checked without being asked
+# for again. Removing the label is the off switch, and is how a pull request goes back to
+# accumulating.
+#
+# Findings are reported in exactly one place: a comment on the pull request that introduced them.
+# There is deliberately no repository-wide audit and no findings issue -- drift is answered for by
+# the pull request that caused it, or not at all.
+#
+# Deliberately NOT a required status check on main, for two independent reasons:
+#   - Whether it runs at all is a reviewer's decision, so on an unlabelled pull request it never
+#     reports, and a required check that never reports blocks merging forever.
+#   - It is a model, not a deterministic script. A false positive must never be able to wedge a
+#     merge. It comments; the owner decides.
+name: Docs coherence
+
+on:
+  pull_request:
+    # labeled is the reviewer asking for the audit; synchronize keeps it running on every later
+    # push while the label is still on. Listing types REPLACES the default
+    # [opened, synchronize, reopened] rather than adding to it, so synchronize has to be named
+    # here -- without it the label would fire exactly once and then sit inert, and a fix pushed in
+    # response to findings would never be re-audited.
+    types: [labeled, synchronize]
+    # Pull requests into main only, deliberately. A stacked pull request (base: another feature
+    # branch) is not audited on its own page, and does not need to be: its content cannot reach
+    # main without passing through a pull request whose base IS main, and labelling that pull
+    # request audits the combined diff against main. Auditing the stack member as well would
+    # double-report the same content, and would audit it against its base branch rather than
+    # against main -- the weaker comparison of the two.
+    branches: [main]
+
+# Least privilege: read the repository, and write only the findings comment.
+permissions:
+  contents: read
+  pull-requests: write
+
+# A new push to a labelled pull request cancels that pull request's audit in progress, so a run
+# is never spent on a diff that has already been superseded.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  coherence:
+    name: Docs coherence
+    # Two event shapes, one gate, and they must not be collapsed into a single condition. There
+    # is no label filter at the `on:` level, so every label added to any pull request into main
+    # starts a run; this skips the job unless the label just added is the one that asks for an
+    # audit. Testing the standing labels on a labeled event instead would mean that once the
+    # pull request carries docs-coherence-review, adding ANY unrelated label spends a full opus
+    # run and posts a second findings comment -- a no-op that quietly costs what this trigger
+    # exists to save. On synchronize github.event.label is null, so there the standing labels
+    # are what decides.
+    if: >-
+      (github.event.action == 'labeled' &&
+      github.event.label.name == 'docs-coherence-review') ||
+      (github.event.action == 'synchronize' &&
+      contains(github.event.pull_request.labels.*.name, 'docs-coherence-review'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      # Third-party actions are pinned to full commit SHAs (tags can be moved); Dependabot updates them.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The rubric diffs the pull request against its merge base, so the history has to be there.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: anthropics/claude-code-action@cfc3eb22bfed5c26ef66e3223c982af27e4524de # v1
+        env:
+          # gh reads GH_TOKEN; the allowlist below limits it to commenting on this pull request.
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # A subscription token from `claude setup-token`, so runs don't incur separate API billing.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Explicit, so the action does not fall back to authenticating as the Claude GitHub App,
+          # whose permission set is far wider than posting one comment needs.
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          # Supplying a prompt puts the action in automation mode: it runs on the event itself,
+          # with no @claude mention.
+          #
+          # The rubric is NOT the checked-out skill, despite appearances. The action treats
+          # CLAUDE.md and .claude/ as security-sensitive (SENSITIVE_PATHS in
+          # src/github/operations/restore-config.ts): on a pull request checkout it deletes the
+          # pull request's copies and restores the base branch's, because the CLI trusts cwd
+          # before any tool-permission gating and a pull request head is attacker-controlled.
+          # That guard is correct and stays. The consequence here is that the skill on disk is
+          # main's, and CLAUDE.md -- one of the two documents under audit -- is main's too, while
+          # README.md is not on that list and is the pull request's. The action does snapshot the
+          # pull request's copies into .claude-pr/, but nothing below points the audit at them,
+          # and the allowlist has no way to read a file at a revision -- git diff and gh pr diff
+          # yield hunks, not files. So the pull request's own CLAUDE.md is fully readable only
+          # through .claude-pr/, and how much of it any given run actually saw is not something
+          # this workflow determines. #67 fixes that by naming .claude-pr/ in the prompt.
+          prompt: |
+            /doc-coherence
+            Mode: pull-request.
+            Base commit: ${{ github.event.pull_request.base.sha }}
+            Pull request: #${{ github.event.pull_request.number }}
+            Post findings as one comment on that pull request. If there are no findings, post
+            nothing at all.
+          # There is deliberately no --max-turns. It is not a budget: the action compares the
+          # num_turns a run REPORTS against the ceiling only after that run has finished, so it
+          # cannot stop, shorten or cheapen anything. Run 35511209528 proved it -- at --max-turns
+          # 20 the audit reached 27 turns, returned is_error false, posted its findings comment,
+          # and only then failed the step. The sole effect a ceiling can have here is to turn a
+          # successful audit red. timeout-minutes on the job above is the real runaway guard.
+          #
+          # This matters because CLAUDE.md treats a red advisory run as "not ready": a ceiling
+          # that manufactures false failures would gate readiness on a bookkeeping mismatch,
+          # which is the wedge this check is designed not to be. A red run here should mean
+          # something genuinely went wrong -- a missing credential, a rate limit, an action bug.
+          claude_args: |
+            --model claude-opus-5
+            --allowedTools "Read,Grep,Glob,Bash(git diff:*),Bash(git log:*),Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr comment:*)"
