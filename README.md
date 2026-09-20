@@ -776,10 +776,13 @@ Changes to this repo go through a structured process, not ad-hoc prompting:
 - **Enforced where possible, self-enforced where not.** Where GitHub can
   enforce a rule structurally, it does: branch protection, required CI
   checks, merge method, auto-delete. The rest is self-enforced: tests
-  accompanying code changes, the Scope/Implement/Trivial choice, and asking
-  for the docs-coherence audit by labelling the PR. There,
+  accompanying code changes, and the Scope/Implement/Trivial choice. There,
   the assistant follows the rule consistently and flags genuinely
-  ambiguous cases rather than deciding silently.
+  ambiguous cases rather than deciding silently. Requesting the
+  docs-coherence audit is self-enforced too, but by the reviewer rather than
+  the assistant — nothing makes a PR get labelled, and the assistant does not
+  label one itself, because deciding the diff is worth auditing is the same
+  judgment call as deciding which document a finding means is wrong.
 
 The complete, current rule set the assistant follows in this repo lives
 in [`CLAUDE.md`](./CLAUDE.md).
