@@ -37,7 +37,7 @@ concurrency:
 jobs:
   coherence:
     name: Docs coherence
-    if: github.event.label.name == "docs-coherence-review"
+    if: github.event.label.name == 'docs-coherence-review'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
