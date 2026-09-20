@@ -11,6 +11,12 @@ name: Docs coherence
 
 on:
   pull_request:
+    # Pull requests into main only, deliberately. A stacked pull request (base: another feature
+    # branch) is not audited on its own page, and does not need to be: its content cannot reach
+    # main without passing through a pull request whose base IS main, and that pull request
+    # re-runs this check on every push, auditing the combined diff against main. Auditing the
+    # stack member as well would double-report the same content, and would audit it against its
+    # base branch rather than against main -- the weaker comparison of the two.
     branches: [main]
     # The files where a contradiction between CLAUDE.md, README.md and the configuration they
     # describe can actually be introduced. A change under Data/src/ cannot create one.
