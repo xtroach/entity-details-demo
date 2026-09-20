@@ -21,8 +21,11 @@ on:
     # The files where a contradiction between CLAUDE.md, README.md and the configuration they
     # describe can actually be introduced -- not every file those documents mention. Being under
     # a project's src/ or test/ does not exempt a file: the Dockerfiles hold the base-image
-    # digests README's "every input is pinned" list claims, and Api.Tests' PostgresFixture holds
-    # the PostgreSQL image README says a docker-compose.yml bump must be hand-copied into.
+    # digests README's "every input is pinned" list claims, and they live under Api/src/ and
+    # BlazorClient/src/. Api.Tests' PostgresFixture is deliberately NOT listed, though README
+    # documents it: the drift it describes starts when docker-compose.yml's PostgreSQL image is
+    # bumped without the hand-copy reaching the fixture, so watching the Compose file catches it
+    # at the source, and a path glob naming one .cs file would break silently on a rename.
     paths:
       - CLAUDE.md
       - README.md
@@ -31,8 +34,8 @@ on:
       - Directory.Packages.props
       - .gitattributes
       - global.json
-      # The rest of README's pinned-versions list: base-image digests, the Compose PostgreSQL
-      # image (whose bump has to reach PostgresFixture by hand), and the dotnet-ef pin.
+      # The rest of README's pinned-versions list: the dotnet-ef pin, the Compose PostgreSQL
+      # image (whose bump has to reach PostgresFixture by hand), and base-image digests.
       - .config/dotnet-tools.json
       - docker-compose.yml
       - "**/Dockerfile"
@@ -89,8 +92,9 @@ jobs:
           # num_turns the run reports; exceeding it fails the step even when the audit itself
           # succeeded. At 20 that is exactly what happened -- run 35511209528 posted its findings,
           # then failed the step reporting num_turns 27 with is_error false. So this has to clear
-          # what a complete audit reports, not what it needs to do the work: eleven trigger paths
-          # report more turns than the original eight, and a run with more findings more again.
+          # what a complete audit reports, not what it needs to do the work: the fifteen trigger
+          # paths report more turns than the original eight, and a run with more findings more
+          # again. Re-derive this if the paths list or the rubric's coverage table grows.
           claude_args: |
             --model claude-opus-5
             --max-turns 50
