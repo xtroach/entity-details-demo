@@ -23,37 +23,6 @@ on:
     # stack member as well would double-report the same content, and would audit it against its
     # base branch rather than against main -- the weaker comparison of the two.
     branches: [main]
-    # The files where a contradiction between CLAUDE.md, README.md and the configuration they
-    # describe can actually be introduced -- not every file those documents mention. Being under
-    # a project's src/ or test/ does not exempt a file: the Dockerfiles hold the base-image
-    # digests README's "every input is pinned" list claims, and they live under Api/src/ and
-    # BlazorClient/src/. Api.Tests' PostgresFixture is deliberately NOT listed, though README
-    # documents it: the drift it describes starts when docker-compose.yml's PostgreSQL image is
-    # bumped without the hand-copy reaching the fixture, so watching the Compose file catches it
-    # at the source, and a path glob naming one .cs file would break silently on a rename.
-    paths:
-      - CLAUDE.md
-      - README.md
-      - .editorconfig
-      - Directory.Build.props
-      - Directory.Packages.props
-      - .gitattributes
-      - global.json
-      # The rest of README's pinned-versions list: the dotnet-ef pin, the Compose PostgreSQL
-      # image (whose bump has to reach PostgresFixture by hand), and base-image digests.
-      - .config/dotnet-tools.json
-      - docker-compose.yml
-      - "**/Dockerfile"
-      # Staging's resources, deploy identity and environment variables are documented in detail.
-      - "infra/**"
-      # The rubric itself: README describes what it does and how it reports, so it can drift from
-      # those claims like any other watched file. Without this a pull request changing only the
-      # rubric never runs the check the rubric defines.
-      - ".claude/skills/**"
-      - .github/workflows/**
-      - .github/dependabot.yml
-      - .github/pull_request_template.md
-      - .github/ISSUE_TEMPLATE/**
 
 # Least privilege: read the repository, and write only the findings comment.
 permissions:
