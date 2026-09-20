@@ -14,6 +14,8 @@ name: Docs coherence
 
 on:
   pull_request:
+
+    types: [labeled]
     # Pull requests into main only, deliberately. A stacked pull request (base: another feature
     # branch) is not audited on its own page, and does not need to be: its content cannot reach
     # main without passing through a pull request whose base IS main, and that pull request
@@ -66,6 +68,7 @@ concurrency:
 jobs:
   coherence:
     name: Docs coherence
+    if: github.event.label.name == "docs-coherence-review"
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
