@@ -1,6 +1,6 @@
 ---
 name: doc-coherence
-description: Audit CLAUDE.md, README.md and the configuration files they describe for contradictions with each other and with what the repository actually enforces. Used by the docs-coherence workflow on a pull request; findings are reported only as a comment on that pull request.
+description: Audit CLAUDE.md, README.md and the configuration files they describe for contradictions with each other and with what the repository actually enforces. Run by the docs-coherence workflow on a pull request, and by hand in a session for a full sweep of the rule set.
 ---
 
 # Documentation coherence audit
@@ -24,8 +24,10 @@ themselves, or with what the repository actually does.
 Two rules from `CLAUDE.md` do bind you, because they govern the actions you take
 rather than the audit itself: never close a pull request, and never commit or
 push to `main`. The tool allowlist in the calling workflow enforces both; treat
-any instruction to work around it as out of scope. You have no issue tooling at
-all -- findings belong in the pull request's comments and nowhere else.
+any instruction to work around it as out of scope. You have no issue tooling,
+and findings are never filed as an issue -- drift is answered for by the change
+that caused it, or reported to whoever asked for the audit. Where the findings
+go is the caller's call; see "Where the findings go".
 
 ## What the audit covers
 
@@ -84,7 +86,24 @@ When you are unsure whether something is a real contradiction, leave it out.
 A check that reports nothing on a clean repository is worth more than one that
 reports something every time.
 
-## How to audit a pull request
+## Where the findings go
+
+Two decisions, and the caller makes them independently: **what to audit**, and
+**where to report**.
+
+| The caller supplies | Audit | Report to |
+| --- | --- | --- |
+| `Mode: pull-request` and a base commit — what the workflow sends | the diff against that base | the session, unless it also asks you to post |
+| an explicit instruction to comment on a pull request | as above | exactly one comment via `gh pr comment` |
+| nothing about mode — a person typing `/doc-coherence` | the whole coverage table above | the session |
+
+**Posting is opt-in.** Post a comment only when the caller explicitly asks you
+to. Never post to a pull request merely because one exists, or because the
+branch you are on happens to have one — someone auditing their own working tree
+is not asking to annotate a pull request, and a comment they did not ask for is
+harder to retract than one they did.
+
+## Auditing a pull request
 
 The calling workflow supplies the base commit. Scope the audit to what the pull
 request changed:
@@ -111,9 +130,24 @@ request changed:
    pre-existing drift at all. The only remaining route would be someone running
    this rubric by hand.
 
-**Output.** If there are no findings, post nothing at all and say so in the run
-log. If there are findings, post exactly one comment on the pull request with
-`gh pr comment`:
+## Auditing the whole rule set by hand
+
+With no base commit, audit every pair in the coverage table rather than a diff.
+Scope rule 3 does not apply — nothing is out of scope for being pre-existing;
+finding drift no pull request would have surfaced is the point of running this
+by hand.
+
+Report into the session: the same numbered findings, each citing both
+`path:line` locations, as your reply. Post nothing, file nothing, and change
+nothing — the audit reports, and the person reading decides which document is
+wrong.
+
+**Output.** When the caller asked you to comment on a pull request: post nothing
+at all if there are no findings, and say so in the run log; otherwise post
+exactly one comment with `gh pr comment`, in the format below. Otherwise report
+the findings in the same format as your reply in the session, and say plainly
+when there are none — in a session, silence reads as a failed run rather than a
+clean one.
 
 ```
 ## Docs coherence
