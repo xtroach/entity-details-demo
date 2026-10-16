@@ -6,7 +6,7 @@
 # published, so only this stage needs the .NET SDK.
 # Base images are pinned by digest so every build uses exactly the same image. The tag stays for
 # readability; Dependabot (.github/dependabot.yml) opens a PR when a new digest is published.
-FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:2fa828c68761b1b8c23d7662dc134421b9d3b59fe1425fdbc80804e390cdb24d AS publish
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:0d99ebf1ccad15037b5c98c9fe8979d6b8dbac23812feae2277a0b277b5c5ffa AS publish
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 # Repo-wide build settings: central package versions (required to restore), the SDK pin and
