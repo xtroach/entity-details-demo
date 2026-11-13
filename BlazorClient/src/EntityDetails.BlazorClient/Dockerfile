@@ -6,7 +6,7 @@
 # published, so only this stage needs the .NET SDK.
 # Base images are pinned by digest so every build uses exactly the same image. The tag stays for
 # readability; Dependabot (.github/dependabot.yml) opens a PR when a new digest is published.
-FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:2fa828c68761b1b8c23d7662dc134421b9d3b59fe1425fdbc80804e390cdb24d AS publish
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:fe0fd4e93bd2fbb47c883b7a6369e5c8d3db8bf01cdc5981f6ee35fbdf3ff4fb AS publish
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 # Repo-wide build settings: central package versions (required to restore), the SDK pin and
@@ -22,7 +22,7 @@ RUN dotnet publish "./EntityDetails.BlazorClient.csproj" -c $BUILD_CONFIGURATION
 
 # This stage serves the published wwwroot. API_BASE_URL, when set, overrides the ApiBaseUrl the
 # browser reads from appsettings.json (see docker-entrypoint.d/40-api-base-url.sh).
-FROM nginx:alpine@sha256:62ff2089abf5a9ed33bd232895bef5e22f7bb4b200675cec49a5ebc48e3d4ac8 AS final
+FROM nginx:alpine@sha256:713fc2ebfd92e8217db451477182ee91944b123d2b1ee9fd5a8c6e91ca6c3a11 AS final
 # Links the published GHCR package to this repository (shown on the repo page; lets its workflows push).
 LABEL org.opencontainers.image.source="https://github.com/xtroach/entity-details-demo"
 COPY BlazorClient/src/EntityDetails.BlazorClient/nginx.conf /etc/nginx/conf.d/default.conf
