@@ -3,7 +3,7 @@
 # This stage is used when running from VS in fast mode (Default for Debug configuration)
 # Base images are pinned by digest so every build uses exactly the same image. The tag stays for
 # readability; Dependabot (.github/dependabot.yml) opens a PR when a new digest is published.
-FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:6a94333d37514e385650a3c81a55e5350b67253dbe136e9cf17e499c35606a8c AS base
+FROM mcr.microsoft.com/dotnet/aspnet:10.0@sha256:12b1135f5f8b3c0a214f2a680ff2033dff4f684f445d6c697d9524ceeb303586 AS base
 # The image holds no data: the database is a separate PostgreSQL server, and its connection string
 # (ConnectionStrings__AppDbContext) must be supplied when the container starts.
 USER $APP_UID
@@ -13,7 +13,7 @@ EXPOSE 8081
 
 
 # This stage is used to build the service project
-FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:2fa828c68761b1b8c23d7662dc134421b9d3b59fe1425fdbc80804e390cdb24d AS build
+FROM mcr.microsoft.com/dotnet/sdk:10.0@sha256:bef136a371963aaa46ec97882845ef6f54dec15728bb4b128b1c2a400ffbc9b4 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 # Repo-wide build settings: central package versions (required to restore), the SDK pin and
