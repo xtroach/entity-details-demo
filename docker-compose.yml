@@ -12,7 +12,7 @@ services:
   db:
     # Pinned by digest like the Dockerfiles' base images; Dependabot (.github/dependabot.yml) keeps it
     # current. Api.Tests' PostgresFixture uses the same image; keep the two in sync.
-    image: postgres:18-alpine@sha256:6c538e7206ea40ff740ef27883529390a690b6ead6ba96b44c67a9f7c638e8fd
+    image: postgres:18-alpine@sha256:0115267ab5a509022df9319c77be365cef335adb71556c75f60f5360ee247e71
     environment:
       POSTGRES_DB: entitydetails
       # Local development only: no password, so no connection string in the repository carries a
